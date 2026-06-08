@@ -1,0 +1,64 @@
+variable "subscription_id" {
+  type        = string
+  description = "Azure subscription ID for opslora-test."
+}
+
+variable "tenant_id" {
+  type        = string
+  description = "Microsoft Entra tenant ID."
+}
+
+variable "platform_state_resource_group_name" {
+  type        = string
+  description = "Terraform state resource group in the hub subscription."
+  default     = "rg-opslora-tfstate-cin"
+}
+
+variable "platform_state_storage_account_name" {
+  type        = string
+  description = "Terraform state storage account in the hub subscription."
+  default     = "stopsloratfstatecin001"
+}
+
+variable "platform_state_container_name" {
+  type        = string
+  description = "Terraform state blob container."
+  default     = "tfstate"
+}
+
+variable "location" {
+  type        = string
+  description = "Primary Azure region."
+  default     = "centralindia"
+}
+
+variable "location_code" {
+  type        = string
+  description = "Short region code."
+  default     = "cin"
+}
+
+variable "kubernetes_version" {
+  type        = string
+  description = "AKS Kubernetes version. Leave null to use Azure default."
+  default     = null
+}
+
+variable "ssh_public_key" {
+  type        = string
+  description = "SSH public key for AKS Linux profile."
+}
+
+variable "tags" {
+  type        = map(string)
+  description = "Common tags."
+  default = {
+    app                = "opslora"
+    env                = "test"
+    owner              = "platform"
+    costCenter         = "opslora"
+    dataClassification = "internal"
+    managedBy          = "terraform"
+  }
+}
+
