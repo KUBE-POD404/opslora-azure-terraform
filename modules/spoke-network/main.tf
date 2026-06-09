@@ -17,14 +17,14 @@ resource "azurerm_subnet" "aks_apps" {
   name                 = "snet-aks-apps"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.41.2.0/22"]
+  address_prefixes     = ["10.41.4.0/22"]
 }
 
 resource "azurerm_subnet" "mysql_flexible" {
   name                 = "snet-mysql-flexible"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.41.7.0/27"]
+  address_prefixes     = ["10.41.10.0/27"]
 
   delegation {
     name = "mysql-flexible-delegation"
@@ -60,14 +60,3 @@ resource "azurerm_virtual_network_peering" "spoke_to_hub" {
   allow_forwarded_traffic      = true
   use_remote_gateways          = false
 }
-
-resource "azurerm_virtual_network_peering" "hub_to_spoke" {
-  name                         = "peer-hub-to-test-cin-001"
-  resource_group_name          = var.hub_rg_name
-  virtual_network_name         = var.hub_vnet_name
-  remote_virtual_network_id    = azurerm_virtual_network.this.id
-  allow_virtual_network_access = true
-  allow_forwarded_traffic      = true
-  allow_gateway_transit        = false
-}
-

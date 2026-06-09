@@ -9,13 +9,19 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   default_node_pool {
     name                         = "system"
-    vm_size                      = "Standard_D2s_v5"
+    vm_size                      = "Standard_D2_v4"
     vnet_subnet_id               = var.system_subnet_id
     auto_scaling_enabled         = true
     min_count                    = 1
     max_count                    = 3
     orchestrator_version         = var.kubernetes_version
     only_critical_addons_enabled = true
+
+    upgrade_settings {
+      drain_timeout_in_minutes      = 0
+      max_surge                     = "10%"
+      node_soak_duration_in_minutes = 0
+    }
   }
 
   identity {
@@ -50,6 +56,11 @@ resource "azurerm_kubernetes_cluster" "this" {
 
   monitor_metrics {}
 
+  key_vault_secrets_provider {
+    secret_rotation_enabled  = true
+    secret_rotation_interval = "2m"
+  }
+
   workload_identity_enabled = true
   oidc_issuer_enabled       = true
 }
@@ -57,7 +68,7 @@ resource "azurerm_kubernetes_cluster" "this" {
 resource "azurerm_kubernetes_cluster_node_pool" "apps" {
   name                  = "apps"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
-  vm_size               = "Standard_D2s_v5"
+  vm_size               = "Standard_D2_v4"
   vnet_subnet_id        = var.apps_subnet_id
   auto_scaling_enabled  = true
   min_count             = 1
@@ -65,4 +76,10 @@ resource "azurerm_kubernetes_cluster_node_pool" "apps" {
   mode                  = "User"
   orchestrator_version  = var.kubernetes_version
   tags                  = var.tags
+
+  upgrade_settings {
+    drain_timeout_in_minutes      = 0
+    max_surge                     = "10%"
+    node_soak_duration_in_minutes = 0
+  }
 }

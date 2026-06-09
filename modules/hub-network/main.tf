@@ -32,6 +32,15 @@ resource "azurerm_subnet" "dns_inbound" {
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = ["10.40.1.0/28"]
+
+  delegation {
+    name = "Microsoft.Network.dnsResolvers"
+
+    service_delegation {
+      name    = "Microsoft.Network/dnsResolvers"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
 }
 
 resource "azurerm_subnet" "dns_outbound" {
@@ -39,6 +48,15 @@ resource "azurerm_subnet" "dns_outbound" {
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = ["10.40.1.16/28"]
+
+  delegation {
+    name = "Microsoft.Network.dnsResolvers"
+
+    service_delegation {
+      name    = "Microsoft.Network/dnsResolvers"
+      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"]
+    }
+  }
 }
 
 resource "azurerm_subnet" "shared_private_endpoints" {
@@ -47,4 +65,3 @@ resource "azurerm_subnet" "shared_private_endpoints" {
   virtual_network_name = azurerm_virtual_network.this.name
   address_prefixes     = ["10.40.2.0/24"]
 }
-

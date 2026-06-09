@@ -3,24 +3,29 @@ variable "subscription_id" {
   description = "Azure subscription ID for opslora-test."
 }
 
+variable "hub_subscription_id" {
+  type        = string
+  description = "Azure subscription ID for opslora-connectivity."
+}
+
 variable "tenant_id" {
   type        = string
   description = "Microsoft Entra tenant ID."
 }
 
-variable "platform_state_resource_group_name" {
+variable "hub_state_resource_group_name" {
   type        = string
   description = "Terraform state resource group in the hub subscription."
   default     = "rg-opslora-tfstate-cin"
 }
 
-variable "platform_state_storage_account_name" {
+variable "hub_state_storage_account_name" {
   type        = string
   description = "Terraform state storage account in the hub subscription."
   default     = "stopsloratfstatecin001"
 }
 
-variable "platform_state_container_name" {
+variable "hub_state_container_name" {
   type        = string
   description = "Terraform state blob container."
   default     = "tfstate"
@@ -61,4 +66,3 @@ variable "tags" {
     managedBy          = "terraform"
   }
 }
-

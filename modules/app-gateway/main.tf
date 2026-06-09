@@ -8,11 +8,34 @@ resource "azurerm_public_ip" "this" {
   tags                = var.tags
 }
 
+resource "azurerm_web_application_firewall_policy" "this" {
+  name                = "wafpol-${var.name}"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
+
+  policy_settings {
+    enabled                     = true
+    mode                        = var.waf_mode
+    request_body_check          = true
+    file_upload_limit_in_mb     = 100
+    max_request_body_size_in_kb = 128
+  }
+
+  managed_rules {
+    managed_rule_set {
+      type    = "OWASP"
+      version = "3.2"
+    }
+  }
+}
+
 resource "azurerm_application_gateway" "this" {
   name                = var.name
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = var.tags
+  firewall_policy_id  = azurerm_web_application_firewall_policy.this.id
 
   sku {
     name     = "WAF_v2"
@@ -63,13 +86,6 @@ resource "azurerm_application_gateway" "this" {
     priority                   = 100
   }
 
-  waf_configuration {
-    enabled          = true
-    firewall_mode    = "Prevention"
-    rule_set_type    = "OWASP"
-    rule_set_version = "3.2"
-  }
-
   lifecycle {
     ignore_changes = [
       backend_address_pool,
@@ -80,8 +96,9 @@ resource "azurerm_application_gateway" "this" {
       request_routing_rule,
       rewrite_rule_set,
       ssl_certificate,
+      tags["ingress-for-aks-cluster-id"],
+      tags["managed-by-k8s-ingress"],
       url_path_map,
     ]
   }
 }
-

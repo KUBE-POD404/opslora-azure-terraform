@@ -1,11 +1,11 @@
-name: Azure Platform Terraform Plan
+name: Azure Hub Terraform Plan
 
 on:
   pull_request:
     paths:
-      - "environments/platform/**"
+      - "environments/hub/**"
       - "modules/**"
-      - ".github/workflows/azure-platform-plan.yml"
+      - ".github/workflows/azure-hub-plan.yml"
   workflow_dispatch:
 
 permissions:
@@ -15,6 +15,9 @@ permissions:
 jobs:
   plan:
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,9 +25,9 @@ jobs:
       - name: Azure login
         uses: azure/login@v2
         with:
-          client-id: ${{ secrets.AZURE_PLATFORM_CLIENT_ID }}
+          client-id: ${{ secrets.AZURE_HUB_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_CONNECTIVITY_SUBSCRIPTION_ID }}
+          subscription-id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
@@ -33,14 +36,13 @@ jobs:
         run: terraform fmt -check -recursive
 
       - name: Terraform init
-        working-directory: environments/platform
+        working-directory: environments/hub
         run: terraform init
 
       - name: Terraform validate
-        working-directory: environments/platform
+        working-directory: environments/hub
         run: terraform validate
 
       - name: Terraform plan
-        working-directory: environments/platform
+        working-directory: environments/hub
         run: terraform plan -input=false
-

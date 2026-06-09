@@ -11,9 +11,9 @@ output "monitor_workspace_id" {
 }
 
 output "managed_grafana_id" {
-  value = azurerm_dashboard_grafana.this.id
+  value = try(azurerm_dashboard_grafana.this[0].id, null)
 }
 
 output "managed_grafana_endpoint" {
-  value = azurerm_dashboard_grafana.this.endpoint
+  value = try(azurerm_dashboard_grafana.this[0].endpoint, null)
 }

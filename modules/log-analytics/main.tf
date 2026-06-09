@@ -15,6 +15,8 @@ resource "azurerm_monitor_workspace" "this" {
 }
 
 resource "azurerm_dashboard_grafana" "this" {
+  count = var.managed_grafana_enabled ? 1 : 0
+
   name                              = replace(var.name, "law-", "amg-")
   location                          = var.location
   resource_group_name               = var.resource_group_name
@@ -22,7 +24,7 @@ resource "azurerm_dashboard_grafana" "this" {
   deterministic_outbound_ip_enabled = false
   public_network_access_enabled     = true
   sku                               = "Standard"
-  grafana_major_version             = 11
+  grafana_major_version             = 12
   tags                              = var.tags
 
   azure_monitor_workspace_integrations {

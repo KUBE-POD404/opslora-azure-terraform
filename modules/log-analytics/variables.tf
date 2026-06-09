@@ -15,8 +15,12 @@ variable "retention_in_days" {
   default = 30
 }
 
+variable "managed_grafana_enabled" {
+  type    = bool
+  default = true
+}
+
 variable "tags" {
   type    = map(string)
   default = {}
 }
-
