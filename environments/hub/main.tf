@@ -3,6 +3,16 @@ locals {
   scope  = "hub"
 }
 
+module "governance" {
+  source                     = "../../modules/subscription-governance"
+  subscription_id            = var.subscription_id
+  location                   = var.location
+  scope_name                 = local.scope
+  admin_principal_object_ids = var.admin_principal_object_ids
+  enable_policy_assignments  = var.enable_governance_policy_assignments
+  tags                       = var.tags
+}
+
 module "resource_groups" {
   source   = "../../modules/resource-groups"
   location = var.location

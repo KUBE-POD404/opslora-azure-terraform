@@ -33,3 +33,14 @@ variable "tags" {
   }
 }
 
+variable "admin_principal_object_ids" {
+  type        = list(string)
+  description = "Admin user/group object IDs that receive Owner at the hub subscription scope."
+  default     = []
+}
+
+variable "enable_governance_policy_assignments" {
+  type        = bool
+  description = "Create audit-mode RBAC/policy governance assignments."
+  default     = true
+}
