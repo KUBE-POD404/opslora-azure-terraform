@@ -118,13 +118,12 @@ Azure RBAC requirements:
 
 Governance policy note:
 
-- The workflows currently set `TF_VAR_enable_governance_policy_assignments=false`
-  so hub/test infrastructure can be brought up with the current OIDC identities.
-- Enable it later only after the Terraform identities have permission for
+- Governance policy assignments are enabled by default.
+- The Terraform identities need permission for
   `Microsoft.Authorization/policyDefinitions/write` and
-  `Microsoft.Authorization/policyAssignments/write`, for example through an
-  approved governance role such as Resource Policy Contributor at the required
-  subscription scope.
+  `Microsoft.Authorization/policyAssignments/write`.
+- Current rollout grants `Resource Policy Contributor` to the hub and test
+  Terraform identities at their subscription scopes.
 
 Recommended first run order:
 
