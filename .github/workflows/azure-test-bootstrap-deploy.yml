@@ -105,8 +105,12 @@ jobs:
 
           jwt_secret="$(openssl rand -base64 48)"
           rabbit_password="$(openssl rand -base64 32)"
-          database_url="mysql+pymysql://${MYSQL_USER}:${mysql_password}@${MYSQL_HOST}:3306/${MYSQL_DATABASE}?ssl_ca=%2Fetc%2Fssl%2Fcerts%2Fca-certificates.crt"
-          rabbit_url="amqp://${RABBIT_USER}:${rabbit_password}@rabbitmq:5672//"
+          mysql_user_encoded="$(jq -nr --arg v "$MYSQL_USER" '$v|@uri')"
+          mysql_password_encoded="$(jq -nr --arg v "$mysql_password" '$v|@uri')"
+          rabbit_user_encoded="$(jq -nr --arg v "$RABBIT_USER" '$v|@uri')"
+          rabbit_password_encoded="$(jq -nr --arg v "$rabbit_password" '$v|@uri')"
+          database_url="mysql+pymysql://${mysql_user_encoded}:${mysql_password_encoded}@${MYSQL_HOST}:3306/${MYSQL_DATABASE}?ssl_ca=%2Fetc%2Fssl%2Fcerts%2Fca-certificates.crt"
+          rabbit_url="amqp://${rabbit_user_encoded}:${rabbit_password_encoded}@rabbitmq:5672//"
 
           set_secret() {
             local name="$1"
