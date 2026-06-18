@@ -105,6 +105,11 @@ jobs:
 
           jwt_secret="$(openssl rand -base64 48)"
           rabbit_password="$(openssl rand -base64 32)"
+          echo "::add-mask::$rabbit_password"
+          {
+            echo "BOOTSTRAP_RABBIT_USER=$RABBIT_USER"
+            echo "BOOTSTRAP_RABBIT_PASSWORD=$rabbit_password"
+          } >> "$GITHUB_ENV"
           mysql_user_encoded="$(jq -nr --arg v "$MYSQL_USER" '$v|@uri')"
           mysql_password_encoded="$(jq -nr --arg v "$mysql_password" '$v|@uri')"
           rabbit_user_encoded="$(jq -nr --arg v "$RABBIT_USER" '$v|@uri')"
@@ -172,10 +177,8 @@ jobs:
             -f opslora-helm/infra/rabbitmq/values-azure-test.yaml \
             --wait --timeout 10m
 
-          rabbit_user="$(kubectl get secret rabbitmq-secret -n "${namespace}" -o jsonpath='{.data.RABBITMQ_DEFAULT_USER}' | base64 -d)"
-          rabbit_pass="$(kubectl get secret rabbitmq-secret -n "${namespace}" -o jsonpath='{.data.RABBITMQ_DEFAULT_PASS}' | base64 -d)"
-          kubectl exec rabbitmq-0 -n "${namespace}" -- rabbitmqctl change_password "${rabbit_user}" "${rabbit_pass}"
-          kubectl exec rabbitmq-0 -n "${namespace}" -- rabbitmqctl set_permissions -p / "${rabbit_user}" ".*" ".*" ".*"
+          kubectl exec rabbitmq-0 -n "${namespace}" -- rabbitmqctl change_password "${BOOTSTRAP_RABBIT_USER}" "${BOOTSTRAP_RABBIT_PASSWORD}"
+          kubectl exec rabbitmq-0 -n "${namespace}" -- rabbitmqctl set_permissions -p / "${BOOTSTRAP_RABBIT_USER}" ".*" ".*" ".*"
 
           helm uninstall inventory -n "${namespace}" --ignore-not-found || true
 
@@ -184,7 +187,7 @@ jobs:
             kubectl delete job "${release}-service-migrate" -n "${namespace}" --ignore-not-found
           done
 
-          for chart in auth customer order invoice payment notification frontend; do
+          for chart in auth customer order invoice payment frontend notification; do
             helm upgrade --install "${chart}" "opslora-helm/apps/${chart}" \
               --namespace "${namespace}" \
               -f "opslora-helm/apps/${chart}/values.yaml" \
