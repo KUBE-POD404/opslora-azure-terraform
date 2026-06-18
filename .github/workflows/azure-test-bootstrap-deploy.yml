@@ -172,6 +172,11 @@ jobs:
             -f opslora-helm/infra/rabbitmq/values-azure-test.yaml \
             --wait --timeout 10m
 
+          rabbit_user="$(kubectl get secret rabbitmq-secret -n "${namespace}" -o jsonpath='{.data.RABBITMQ_DEFAULT_USER}' | base64 -d)"
+          rabbit_pass="$(kubectl get secret rabbitmq-secret -n "${namespace}" -o jsonpath='{.data.RABBITMQ_DEFAULT_PASS}' | base64 -d)"
+          kubectl exec rabbitmq-0 -n "${namespace}" -- rabbitmqctl change_password "${rabbit_user}" "${rabbit_pass}"
+          kubectl exec rabbitmq-0 -n "${namespace}" -- rabbitmqctl set_permissions -p / "${rabbit_user}" ".*" ".*" ".*"
+
           helm uninstall inventory -n "${namespace}" --ignore-not-found || true
 
           for release in auth customer inventory order invoice payment; do
