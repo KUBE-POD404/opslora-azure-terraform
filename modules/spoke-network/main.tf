@@ -10,21 +10,21 @@ resource "azurerm_subnet" "aks_system" {
   name                 = "snet-aks-system"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.41.0.0/23"]
+  address_prefixes     = [var.subnet_address_prefixes.aks_system]
 }
 
 resource "azurerm_subnet" "aks_apps" {
   name                 = "snet-aks-apps"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.41.4.0/22"]
+  address_prefixes     = [var.subnet_address_prefixes.aks_apps]
 }
 
 resource "azurerm_subnet" "mysql_flexible" {
   name                 = "snet-mysql-flexible"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.41.10.0/27"]
+  address_prefixes     = [var.subnet_address_prefixes.mysql_flexible]
 
   delegation {
     name = "mysql-flexible-delegation"
@@ -40,7 +40,7 @@ resource "azurerm_subnet" "private_endpoints" {
   name                              = "snet-private-endpoints"
   resource_group_name               = var.resource_group_name
   virtual_network_name              = azurerm_virtual_network.this.name
-  address_prefixes                  = ["10.41.8.0/24"]
+  address_prefixes                  = [var.subnet_address_prefixes.private_endpoints]
   private_endpoint_network_policies = "Disabled"
 }
 
@@ -48,11 +48,11 @@ resource "azurerm_subnet" "ingress" {
   name                 = "snet-ingress"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.this.name
-  address_prefixes     = ["10.41.9.0/24"]
+  address_prefixes     = [var.subnet_address_prefixes.ingress]
 }
 
 resource "azurerm_virtual_network_peering" "spoke_to_hub" {
-  name                         = "peer-test-to-hub-cin-001"
+  name                         = var.spoke_to_hub_peering_name
   resource_group_name          = var.resource_group_name
   virtual_network_name         = azurerm_virtual_network.this.name
   remote_virtual_network_id    = var.hub_vnet_id

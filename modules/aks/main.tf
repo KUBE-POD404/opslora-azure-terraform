@@ -1,19 +1,20 @@
 resource "azurerm_kubernetes_cluster" "this" {
-  name                = var.name
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  dns_prefix          = var.name
-  kubernetes_version  = var.kubernetes_version
-  sku_tier            = "Free"
-  tags                = var.tags
+  name                    = var.name
+  location                = var.location
+  resource_group_name     = var.resource_group_name
+  dns_prefix              = var.name
+  kubernetes_version      = var.kubernetes_version
+  sku_tier                = var.sku_tier
+  private_cluster_enabled = var.private_cluster_enabled
+  tags                    = var.tags
 
   default_node_pool {
     name                         = "system"
-    vm_size                      = "Standard_D2_v4"
+    vm_size                      = var.system_node_pool.vm_size
     vnet_subnet_id               = var.system_subnet_id
     auto_scaling_enabled         = true
-    min_count                    = 1
-    max_count                    = 3
+    min_count                    = var.system_node_pool.min_count
+    max_count                    = var.system_node_pool.max_count
     orchestrator_version         = var.kubernetes_version
     only_critical_addons_enabled = true
 
@@ -40,9 +41,9 @@ resource "azurerm_kubernetes_cluster" "this" {
     network_plugin      = "azure"
     network_plugin_mode = "overlay"
     network_policy      = "azure"
-    pod_cidr            = "100.64.0.0/16"
-    service_cidr        = "10.241.0.0/16"
-    dns_service_ip      = "10.241.0.10"
+    pod_cidr            = var.pod_cidr
+    service_cidr        = var.service_cidr
+    dns_service_ip      = var.dns_service_ip
     outbound_type       = "loadBalancer"
   }
 
@@ -68,11 +69,11 @@ resource "azurerm_kubernetes_cluster" "this" {
 resource "azurerm_kubernetes_cluster_node_pool" "apps" {
   name                  = "apps"
   kubernetes_cluster_id = azurerm_kubernetes_cluster.this.id
-  vm_size               = "Standard_D2_v4"
+  vm_size               = var.apps_node_pool.vm_size
   vnet_subnet_id        = var.apps_subnet_id
   auto_scaling_enabled  = true
-  min_count             = 1
-  max_count             = 5
+  min_count             = var.apps_node_pool.min_count
+  max_count             = var.apps_node_pool.max_count
   mode                  = "User"
   orchestrator_version  = var.kubernetes_version
   tags                  = var.tags

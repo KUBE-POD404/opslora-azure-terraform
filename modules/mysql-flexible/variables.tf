@@ -31,6 +31,49 @@ variable "administrator_password" {
   default     = null
 }
 
+variable "sku_name" {
+  type        = string
+  description = "MySQL Flexible Server SKU."
+  default     = "B_Standard_B1ms"
+}
+
+variable "mysql_version" {
+  type        = string
+  description = "MySQL Flexible Server engine version."
+  default     = "8.0.21"
+}
+
+variable "backup_retention_days" {
+  type        = number
+  description = "Backup retention in days."
+  default     = 7
+}
+
+variable "geo_redundant_backup_enabled" {
+  type        = bool
+  description = "Enable geo-redundant backups where Azure supports it."
+  default     = false
+}
+
+variable "zone" {
+  type        = string
+  description = "Primary availability zone."
+  default     = "1"
+}
+
+variable "high_availability" {
+  type = object({
+    enabled                   = bool
+    mode                      = string
+    standby_availability_zone = optional(string)
+  })
+  description = "Optional high availability settings for production."
+  default = {
+    enabled = false
+    mode    = "ZoneRedundant"
+  }
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

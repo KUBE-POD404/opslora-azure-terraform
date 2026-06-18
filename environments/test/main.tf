@@ -53,8 +53,16 @@ module "spoke_network" {
   location            = var.location
   resource_group_name = module.resource_groups.names["rg-${local.prefix}-${local.env}-network-${var.location_code}"]
   address_space       = ["10.41.0.0/20"]
-  hub_vnet_id         = data.terraform_remote_state.hub.outputs.hub_vnet_id
-  tags                = var.tags
+  subnet_address_prefixes = {
+    aks_system        = "10.41.0.0/23"
+    aks_apps          = "10.41.4.0/22"
+    private_endpoints = "10.41.8.0/24"
+    ingress           = "10.41.9.0/24"
+    mysql_flexible    = "10.41.10.0/27"
+  }
+  hub_vnet_id               = data.terraform_remote_state.hub.outputs.hub_vnet_id
+  spoke_to_hub_peering_name = "peer-${local.env}-to-hub-${var.location_code}-001"
+  tags                      = var.tags
 }
 
 resource "azurerm_virtual_network_peering" "hub_to_spoke" {
@@ -137,6 +145,9 @@ module "aks" {
   app_gateway_id             = module.app_gateway.id
   log_analytics_workspace_id = module.monitoring.workspace_id
   ssh_public_key             = var.ssh_public_key
+  pod_cidr                   = "100.64.0.0/16"
+  service_cidr               = "10.241.0.0/16"
+  dns_service_ip             = "10.241.0.10"
   tags                       = var.tags
 }
 

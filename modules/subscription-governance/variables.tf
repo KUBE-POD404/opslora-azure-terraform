@@ -31,6 +31,39 @@ variable "enable_policy_assignments" {
   default     = true
 }
 
+variable "policy_effect" {
+  type        = string
+  description = "Default effect for Opslora custom policies. Use Audit in test and Deny in prod after readiness checks."
+  default     = "Audit"
+
+  validation {
+    condition     = contains(["Audit", "Deny", "Disabled"], var.policy_effect)
+    error_message = "policy_effect must be Audit, Deny, or Disabled."
+  }
+}
+
+variable "key_vault_public_network_effect" {
+  type        = string
+  description = "Effect for the built-in Key Vault public network policy."
+  default     = "Audit"
+
+  validation {
+    condition     = contains(["Audit", "Deny", "Disabled"], var.key_vault_public_network_effect)
+    error_message = "key_vault_public_network_effect must be Audit, Deny, or Disabled."
+  }
+}
+
+variable "aks_workload_identity_effect" {
+  type        = string
+  description = "Effect for the built-in AKS Workload Identity policy."
+  default     = "Audit"
+
+  validation {
+    condition     = contains(["Audit", "Deny", "Disabled"], var.aks_workload_identity_effect)
+    error_message = "aks_workload_identity_effect must be Audit, Deny, or Disabled."
+  }
+}
+
 variable "allowed_locations" {
   type        = list(string)
   description = "Approved Azure locations. Include global for global resources such as DNS."

@@ -1,9 +1,15 @@
 locals {
   subscription_scope = "/subscriptions/${var.subscription_id}"
 
-  audit_effect_parameter = jsonencode({
+  key_vault_public_network_effect_parameter = jsonencode({
     effect = {
-      value = "Audit"
+      value = var.key_vault_public_network_effect
+    }
+  })
+
+  aks_workload_identity_effect_parameter = jsonencode({
+    effect = {
+      value = var.aks_workload_identity_effect
     }
   })
 }
@@ -39,7 +45,7 @@ resource "azurerm_policy_definition" "audit_allowed_locations" {
     effect = {
       type          = "String"
       defaultValue  = "Audit"
-      allowedValues = ["Audit", "Disabled"]
+      allowedValues = ["Audit", "Deny", "Disabled"]
       metadata = {
         displayName = "Effect"
       }
@@ -79,7 +85,7 @@ resource "azurerm_subscription_policy_assignment" "audit_allowed_locations" {
       value = var.allowed_locations
     }
     effect = {
-      value = "Audit"
+      value = var.policy_effect
     }
   })
 
@@ -111,7 +117,7 @@ resource "azurerm_policy_definition" "audit_required_tag" {
     effect = {
       type          = "String"
       defaultValue  = "Audit"
-      allowedValues = ["Audit", "Disabled"]
+      allowedValues = ["Audit", "Deny", "Disabled"]
       metadata = {
         displayName = "Effect"
       }
@@ -143,7 +149,7 @@ resource "azurerm_subscription_policy_assignment" "audit_required_tags" {
       value = each.value
     }
     effect = {
-      value = "Audit"
+      value = var.policy_effect
     }
   })
 
@@ -166,7 +172,7 @@ resource "azurerm_subscription_policy_assignment" "audit_key_vault_public_networ
   policy_definition_id = data.azurerm_policy_definition.key_vault_disable_public_network[0].id
   subscription_id      = local.subscription_scope
   location             = var.location
-  parameters           = local.audit_effect_parameter
+  parameters           = local.key_vault_public_network_effect_parameter
 
   non_compliance_message {
     content = "Key Vault public network access should be disabled after bootstrap."
@@ -187,7 +193,7 @@ resource "azurerm_subscription_policy_assignment" "audit_aks_workload_identity" 
   policy_definition_id = data.azurerm_policy_definition.aks_workload_identity[0].id
   subscription_id      = local.subscription_scope
   location             = var.location
-  parameters           = local.audit_effect_parameter
+  parameters           = local.aks_workload_identity_effect_parameter
 
   non_compliance_message {
     content = "AKS clusters should enable Workload Identity."

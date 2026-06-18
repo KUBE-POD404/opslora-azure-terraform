@@ -1,0 +1,85 @@
+name: Azure Prod Terraform Apply
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_apply:
+        description: "Type apply-prod to run terraform apply for opslora-prod."
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-prod-apply
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    if: ${{ inputs.confirm_apply == 'apply-prod' && github.ref == 'refs/heads/azure/hub-test-foundation' }}
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_subscription_id: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+      TF_VAR_hub_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_VAR_ssh_public_key: ${{ secrets.AZURE_AKS_SSH_PUBLIC_KEY }}
+      TF_VAR_enable_rbac_assignments: ${{ vars.ENABLE_PROD_RBAC_ASSIGNMENTS || 'false' }}
+      TF_VAR_rbac_group_object_ids: ${{ vars.PROD_RBAC_GROUP_OBJECT_IDS || '{}' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: environments/prod
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: environments/prod
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: environments/prod
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform apply
+        working-directory: environments/prod
+        shell: bash
+        run: |
+          set +e
+          terraform apply -input=false -auto-approve tfplan -no-color 2>&1 | tee tfapply-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Prod Terraform Apply"
+            echo
+            echo '```text'
+            tail -n 200 tfapply-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload apply artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-tfapply-${{ github.run_id }}
+          path: environments/prod/tfapply-output.txt
+          retention-days: 14

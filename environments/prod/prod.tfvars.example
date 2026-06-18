@@ -1,0 +1,15 @@
+subscription_id     = "00000000-0000-0000-0000-000000000000"
+hub_subscription_id = "2879c873-3751-40c2-b43a-ba4c1198ba89"
+tenant_id           = "7f02300f-0f1b-4237-b981-c376377f394e"
+ssh_public_key      = "ssh-rsa REPLACE_WITH_PROD_AKS_PUBLIC_KEY"
+
+enable_rbac_assignments = false
+rbac_group_object_ids = {
+  "opslora-network-admins"        = "00000000-0000-0000-0000-000000000000"
+  "opslora-security-admins"       = "00000000-0000-0000-0000-000000000000"
+  "opslora-data-admins"           = "00000000-0000-0000-0000-000000000000"
+  "opslora-aks-admins-prod"       = "00000000-0000-0000-0000-000000000000"
+  "opslora-release-managers-prod" = "00000000-0000-0000-0000-000000000000"
+  "opslora-observability-admins"  = "00000000-0000-0000-0000-000000000000"
+  "opslora-breakglass-admins"     = "00000000-0000-0000-0000-000000000000"
+}

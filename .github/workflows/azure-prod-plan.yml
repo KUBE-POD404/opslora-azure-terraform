@@ -1,0 +1,89 @@
+name: Azure Prod Terraform Plan
+
+on:
+  pull_request:
+    paths:
+      - "environments/prod/**"
+      - "modules/**"
+      - ".github/workflows/azure-prod-plan.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-prod-plan-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  plan:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/azure/hub-test-foundation' }}
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      TF_IN_AUTOMATION: "true"
+      TF_VAR_subscription_id: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+      TF_VAR_hub_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_VAR_ssh_public_key: ${{ secrets.AZURE_AKS_SSH_PUBLIC_KEY }}
+      TF_VAR_enable_rbac_assignments: ${{ vars.ENABLE_PROD_RBAC_ASSIGNMENTS || 'false' }}
+      TF_VAR_rbac_group_object_ids: ${{ vars.PROD_RBAC_GROUP_OBJECT_IDS || '{}' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: environments/prod
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: environments/prod
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: environments/prod
+        shell: bash
+        run: |
+          set +e
+          terraform plan -input=false -out=tfplan -no-color 2>&1 | tee tfplan-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Prod Terraform Plan"
+            echo
+            echo '```text'
+            tail -n 200 tfplan-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Save plan summary
+        if: success()
+        working-directory: environments/prod
+        run: terraform show -no-color tfplan > tfplan.txt
+
+      - name: Upload plan artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-tfplan-${{ github.run_id }}
+          path: |
+            environments/prod/tfplan
+            environments/prod/tfplan.txt
+            environments/prod/tfplan-output.txt
+          retention-days: 14
