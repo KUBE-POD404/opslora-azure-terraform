@@ -7,6 +7,13 @@ on:
       - "modules/**"
       - ".github/workflows/azure-test-plan.yml"
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Azure Hub Terraform Apply
+    types:
+      - completed
+    branches:
+      - azure/hub-test-foundation
 
 permissions:
   id-token: write
@@ -18,6 +25,7 @@ concurrency:
 
 jobs:
   plan:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     env:
       TF_IN_AUTOMATION: "true"

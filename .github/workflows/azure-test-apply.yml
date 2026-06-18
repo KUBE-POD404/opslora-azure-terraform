@@ -18,9 +18,8 @@ concurrency:
 
 jobs:
   apply:
-    if: ${{ inputs.confirm_apply == 'apply-test' }}
+    if: ${{ inputs.confirm_apply == 'apply-test' && github.ref == 'refs/heads/azure/hub-test-foundation' }}
     runs-on: ubuntu-latest
-    environment: test
     env:
       TF_IN_AUTOMATION: "true"
       TF_VAR_subscription_id: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}

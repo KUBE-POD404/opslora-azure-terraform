@@ -93,18 +93,18 @@ Workflows:
 | Workflow | Trigger | Root | Purpose |
 | --- | --- | --- | --- |
 | `Azure Hub Terraform Plan` | pull request or manual | `environments/hub` | Formats, initializes, validates, and uploads a hub plan artifact. |
-| `Azure Hub Terraform Apply` | manual only | `environments/hub` | Re-plans and applies hub changes after the `hub` environment approval gate. |
-| `Azure Test Terraform Plan` | pull request or manual | `environments/test` | Formats, initializes, validates, and uploads a test plan artifact. |
-| `Azure Test Terraform Apply` | manual only | `environments/test` | Re-plans and applies test changes after the `test` environment approval gate. |
+| `Azure Hub Terraform Apply` | manual only | `environments/hub` | Re-plans and applies hub changes after typed confirmation. |
+| `Azure Test Terraform Plan` | pull request, manual, or after successful hub apply | `environments/test` | Formats, initializes, validates, and uploads a test plan artifact. |
+| `Azure Test Terraform Apply` | manual only | `environments/test` | Re-plans and applies test changes after typed confirmation. |
 
 Apply workflows require a typed confirmation:
 
 - Hub apply: `apply-hub`
 - Test apply: `apply-test`
 
-Create GitHub environments named `hub` and `test`, then add required reviewers to
-both environments before using apply. Keep plan workflows unprotected so pull
-requests can show drift and proposed changes without waiting for approval.
+Apply workflows are restricted to the `azure/hub-test-foundation` branch and
+require typed confirmation. The test plan workflow also runs automatically after
+a successful hub apply because the test root depends on hub remote-state outputs.
 
 Azure RBAC requirements:
 
@@ -121,7 +121,7 @@ Recommended first run order:
 1. Run `Azure Hub Terraform Plan`.
 2. Review the uploaded `hub-tfplan-*` artifact.
 3. Run `Azure Hub Terraform Apply` with `apply-hub`.
-4. Run `Azure Test Terraform Plan`.
+4. Wait for the automatic `Azure Test Terraform Plan` run.
 5. Review the uploaded `test-tfplan-*` artifact.
 6. Run `Azure Test Terraform Apply` with `apply-test`.
 
