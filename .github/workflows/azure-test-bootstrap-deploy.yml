@@ -172,12 +172,14 @@ jobs:
             -f opslora-helm/infra/rabbitmq/values-azure-test.yaml \
             --wait --timeout 10m
 
+          helm uninstall inventory -n "${namespace}" --ignore-not-found || true
+
           for release in auth customer inventory order invoice payment; do
             kubectl delete job "${release}-migrate" -n "${namespace}" --ignore-not-found
             kubectl delete job "${release}-service-migrate" -n "${namespace}" --ignore-not-found
           done
 
-          for chart in auth customer inventory order invoice payment notification frontend; do
+          for chart in auth customer order invoice payment notification frontend; do
             helm upgrade --install "${chart}" "opslora-helm/apps/${chart}" \
               --namespace "${namespace}" \
               -f "opslora-helm/apps/${chart}/values.yaml" \
