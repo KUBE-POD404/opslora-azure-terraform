@@ -57,4 +57,24 @@ jobs:
 
       - name: Terraform apply
         working-directory: environments/hub
-        run: terraform apply -input=false -auto-approve tfplan
+        shell: bash
+        run: |
+          set +e
+          terraform apply -input=false -auto-approve tfplan -no-color 2>&1 | tee tfapply-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Hub Terraform Apply"
+            echo
+            echo '```text'
+            tail -n 200 tfapply-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload apply artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hub-tfapply-${{ github.run_id }}
+          path: environments/hub/tfapply-output.txt
+          retention-days: 7
