@@ -54,17 +54,32 @@ jobs:
 
       - name: Terraform plan
         working-directory: environments/test
-        run: terraform plan -input=false -out=tfplan
+        shell: bash
+        run: |
+          set +e
+          terraform plan -input=false -out=tfplan -no-color 2>&1 | tee tfplan-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Test Terraform Plan"
+            echo
+            echo '```text'
+            tail -n 200 tfplan-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
 
       - name: Save plan summary
+        if: success()
         working-directory: environments/test
         run: terraform show -no-color tfplan > tfplan.txt
 
       - name: Upload plan artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-tfplan-${{ github.run_id }}
           path: |
             environments/test/tfplan
             environments/test/tfplan.txt
+            environments/test/tfplan-output.txt
           retention-days: 7
