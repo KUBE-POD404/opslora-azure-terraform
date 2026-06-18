@@ -2,16 +2,27 @@ name: Azure Hub Terraform Apply
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_apply:
+        description: 'Type apply-hub to run terraform apply for opslora-connectivity.'
+        required: true
+        type: string
 
 permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: terraform-hub-apply
+  cancel-in-progress: false
+
 jobs:
   apply:
+    if: ${{ inputs.confirm_apply == 'apply-hub' }}
     runs-on: ubuntu-latest
     environment: hub
     env:
+      TF_IN_AUTOMATION: "true"
       TF_VAR_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
     steps:
@@ -27,11 +38,24 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
 
       - name: Terraform init
         working-directory: environments/hub
         run: terraform init
 
+      - name: Terraform validate
+        working-directory: environments/hub
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: environments/hub
+        run: terraform plan -input=false -out=tfplan
+
       - name: Terraform apply
         working-directory: environments/hub
-        run: terraform apply -input=false -auto-approve
+        run: terraform apply -input=false -auto-approve tfplan

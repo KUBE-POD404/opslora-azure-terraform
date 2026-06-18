@@ -12,10 +12,15 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: terraform-test-plan-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   plan:
     runs-on: ubuntu-latest
     env:
+      TF_IN_AUTOMATION: "true"
       TF_VAR_subscription_id: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
       TF_VAR_hub_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
@@ -33,6 +38,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
 
       - name: Terraform fmt
         run: terraform fmt -check -recursive
@@ -47,4 +54,17 @@ jobs:
 
       - name: Terraform plan
         working-directory: environments/test
-        run: terraform plan -input=false
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Save plan summary
+        working-directory: environments/test
+        run: terraform show -no-color tfplan > tfplan.txt
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-tfplan-${{ github.run_id }}
+          path: |
+            environments/test/tfplan
+            environments/test/tfplan.txt
+          retention-days: 7

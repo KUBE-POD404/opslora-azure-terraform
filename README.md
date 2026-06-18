@@ -82,3 +82,49 @@ For GitHub Actions, configure these repository or environment secrets:
 | `AZURE_TEST_CLIENT_ID` | Test Terraform OIDC identity |
 | `AZURE_TEST_SUBSCRIPTION_ID` | Test subscription |
 | `AZURE_AKS_SSH_PUBLIC_KEY` | Test AKS Linux profile |
+
+## GitHub Actions Terraform Pipelines
+
+Terraform is intended to run from GitHub Actions for the hub and test roots so the
+operator laptop does not need local provider mirrors or long-lived Azure secrets.
+
+Workflows:
+
+| Workflow | Trigger | Root | Purpose |
+| --- | --- | --- | --- |
+| `Azure Hub Terraform Plan` | pull request or manual | `environments/hub` | Formats, initializes, validates, and uploads a hub plan artifact. |
+| `Azure Hub Terraform Apply` | manual only | `environments/hub` | Re-plans and applies hub changes after the `hub` environment approval gate. |
+| `Azure Test Terraform Plan` | pull request or manual | `environments/test` | Formats, initializes, validates, and uploads a test plan artifact. |
+| `Azure Test Terraform Apply` | manual only | `environments/test` | Re-plans and applies test changes after the `test` environment approval gate. |
+
+Apply workflows require a typed confirmation:
+
+- Hub apply: `apply-hub`
+- Test apply: `apply-test`
+
+Create GitHub environments named `hub` and `test`, then add required reviewers to
+both environments before using apply. Keep plan workflows unprotected so pull
+requests can show drift and proposed changes without waiting for approval.
+
+Azure RBAC requirements:
+
+- `AZURE_HUB_CLIENT_ID` needs enough access in `opslora-connectivity` to manage
+  the hub root and read/write `platform/terraform.tfstate`.
+- `AZURE_TEST_CLIENT_ID` needs enough access in `opslora-test` to manage the
+  test root.
+- `AZURE_TEST_CLIENT_ID` also needs hub-side access to read the remote hub state
+  blob and manage the hub-to-test peering plus Private DNS VNet links, because
+  `environments/test` uses an `azurerm.hub` provider alias.
+
+Recommended first run order:
+
+1. Run `Azure Hub Terraform Plan`.
+2. Review the uploaded `hub-tfplan-*` artifact.
+3. Run `Azure Hub Terraform Apply` with `apply-hub`.
+4. Run `Azure Test Terraform Plan`.
+5. Review the uploaded `test-tfplan-*` artifact.
+6. Run `Azure Test Terraform Apply` with `apply-test`.
+
+The workflows pin Terraform CLI to `1.12.2`. If provider lock files need to be
+refreshed, do it in a clean runner/VM and commit the updated lock files with
+checksums for Linux runners.

@@ -2,16 +2,27 @@ name: Azure Test Terraform Apply
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_apply:
+        description: 'Type apply-test to run terraform apply for opslora-test.'
+        required: true
+        type: string
 
 permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: terraform-test-apply
+  cancel-in-progress: false
+
 jobs:
   apply:
+    if: ${{ inputs.confirm_apply == 'apply-test' }}
     runs-on: ubuntu-latest
     environment: test
     env:
+      TF_IN_AUTOMATION: "true"
       TF_VAR_subscription_id: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
       TF_VAR_hub_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
@@ -29,11 +40,24 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
 
       - name: Terraform init
         working-directory: environments/test
         run: terraform init
 
+      - name: Terraform validate
+        working-directory: environments/test
+        run: terraform validate
+
+      - name: Terraform plan
+        working-directory: environments/test
+        run: terraform plan -input=false -out=tfplan
+
       - name: Terraform apply
         working-directory: environments/test
-        run: terraform apply -input=false -auto-approve
+        run: terraform apply -input=false -auto-approve tfplan

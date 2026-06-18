@@ -12,10 +12,15 @@ permissions:
   id-token: write
   contents: read
 
+concurrency:
+  group: terraform-hub-plan-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   plan:
     runs-on: ubuntu-latest
     env:
+      TF_IN_AUTOMATION: "true"
       TF_VAR_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
     steps:
@@ -31,6 +36,8 @@ jobs:
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
 
       - name: Terraform fmt
         run: terraform fmt -check -recursive
@@ -45,4 +52,17 @@ jobs:
 
       - name: Terraform plan
         working-directory: environments/hub
-        run: terraform plan -input=false
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Save plan summary
+        working-directory: environments/hub
+        run: terraform show -no-color tfplan > tfplan.txt
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hub-tfplan-${{ github.run_id }}
+          path: |
+            environments/hub/tfplan
+            environments/hub/tfplan.txt
+          retention-days: 7
