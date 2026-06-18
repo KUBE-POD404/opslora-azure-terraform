@@ -33,6 +33,7 @@ jobs:
       TF_VAR_hub_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
       TF_VAR_ssh_public_key: ${{ secrets.AZURE_AKS_SSH_PUBLIC_KEY }}
+      TF_VAR_enable_governance_policy_assignments: "false"
     steps:
       - name: Checkout
         uses: actions/checkout@v4

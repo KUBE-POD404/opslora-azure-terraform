@@ -116,6 +116,16 @@ Azure RBAC requirements:
   blob and manage the hub-to-test peering plus Private DNS VNet links, because
   `environments/test` uses an `azurerm.hub` provider alias.
 
+Governance policy note:
+
+- The workflows currently set `TF_VAR_enable_governance_policy_assignments=false`
+  so hub/test infrastructure can be brought up with the current OIDC identities.
+- Enable it later only after the Terraform identities have permission for
+  `Microsoft.Authorization/policyDefinitions/write` and
+  `Microsoft.Authorization/policyAssignments/write`, for example through an
+  approved governance role such as Resource Policy Contributor at the required
+  subscription scope.
+
 Recommended first run order:
 
 1. Run `Azure Hub Terraform Plan`.
