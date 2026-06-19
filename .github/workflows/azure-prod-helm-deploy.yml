@@ -1,0 +1,280 @@
+name: Azure Prod Helm Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: "Kubernetes namespace"
+        required: true
+        default: "opslora-app-ns"
+      bootstrap_secrets:
+        description: "Write generated/provided runtime secrets into prod Key Vault. Requires network access to the private vault."
+        required: true
+        type: boolean
+        default: false
+      auth_tag:
+        description: "Auth image tag, semver release for prod"
+        required: true
+      customer_tag:
+        description: "Customer image tag, semver release for prod"
+        required: true
+      inventory_tag:
+        description: "Inventory image tag, semver release for prod"
+        required: true
+      order_tag:
+        description: "Order image tag, semver release for prod"
+        required: true
+      invoice_tag:
+        description: "Invoice image tag, semver release for prod"
+        required: true
+      payment_tag:
+        description: "Payment image tag, semver release for prod"
+        required: true
+      notification_tag:
+        description: "Notification image tag, semver release for prod"
+        required: true
+      frontend_tag:
+        description: "Frontend image tag, semver release for prod"
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-prod-helm-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' }}
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      AZURE_PROD_CLIENT_ID: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+      AZURE_PROD_SUBSCRIPTION_ID: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      TF_IN_AUTOMATION: "true"
+      KEY_VAULT_NAME: kv-opslora-prod-cin-001
+      KEY_VAULT_RG: rg-opslora-prod-security-cin
+      AKS_RG: rg-opslora-prod-aks-cin
+      AKS_NAME: aks-opslora-prod-cin-001
+      MYSQL_DATABASE: opslora
+      MYSQL_USER: opsloraadmin
+      RABBIT_USER: opslora
+      API_URL: https://app.opslora.com
+      SMTP_HOST: smtp.hostinger.com
+      SMTP_PORT: "587"
+      SMTP_USER: notification@opslora.com
+      SMTP_PASS: ${{ secrets.PROD_SMTP_PASS }}
+      SMTP_STARTTLS: "true"
+      FROM_EMAIL: notification@opslora.com
+      FROM_NAME: Opslora
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check required secrets
+        shell: bash
+        run: |
+          missing=()
+          for name in AZURE_PROD_CLIENT_ID AZURE_PROD_SUBSCRIPTION_ID AZURE_TENANT_ID; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if [[ "${{ inputs.bootstrap_secrets }}" == "true" && -z "${SMTP_PASS:-}" ]]; then
+            missing+=("PROD_SMTP_PASS")
+          fi
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required GitHub secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_PROD_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_PROD_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Terraform output
+        working-directory: environments/prod
+        shell: bash
+        run: |
+          set -euo pipefail
+          terraform init
+          {
+            echo "AKS_KV_IDENTITY_CLIENT_ID=$(terraform output -raw aks_key_vault_secrets_provider_client_id)"
+            echo "MYSQL_HOST=$(terraform output -raw mysql_fqdn)"
+          } >> "$GITHUB_ENV"
+
+      - name: Bootstrap prod Key Vault secrets
+        if: ${{ inputs.bootstrap_secrets }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mysql_password="$(terraform -chdir=environments/prod output -raw mysql_administrator_password 2>/dev/null || true)"
+          if [[ -z "$mysql_password" ]]; then
+            echo "MySQL password output is unavailable. Seed database URL manually or expose a controlled bootstrap secret source." >&2
+            exit 1
+          fi
+
+          existing_or_random() {
+            local name="$1"
+            local bytes="$2"
+            local existing
+            existing="$(az keyvault secret show --vault-name "$KEY_VAULT_NAME" --name "$name" --query value -o tsv 2>/dev/null || true)"
+            if [[ -n "$existing" ]]; then
+              printf '%s' "$existing"
+            else
+              openssl rand -base64 "$bytes"
+            fi
+          }
+
+          jwt_secret="$(existing_or_random opslora-prod-auth-jwt-secret-key 48)"
+          rabbit_password="$(existing_or_random opslora-prod-rabbitmq-default-pass 32)"
+          echo "::add-mask::$jwt_secret"
+          echo "::add-mask::$rabbit_password"
+
+          mysql_user_encoded="$(jq -nr --arg v "$MYSQL_USER" '$v|@uri')"
+          mysql_password_encoded="$(jq -nr --arg v "$mysql_password" '$v|@uri')"
+          rabbit_user_encoded="$(jq -nr --arg v "$RABBIT_USER" '$v|@uri')"
+          rabbit_password_encoded="$(jq -nr --arg v "$rabbit_password" '$v|@uri')"
+          database_url="mysql+pymysql://${mysql_user_encoded}:${mysql_password_encoded}@${MYSQL_HOST}:3306/${MYSQL_DATABASE}?ssl_ca=%2Fetc%2Fssl%2Fcerts%2Fca-certificates.crt"
+          rabbit_url="amqp://${rabbit_user_encoded}:${rabbit_password_encoded}@rabbitmq:5672//"
+
+          set_secret() {
+            local name="$1"
+            local value="$2"
+            local file
+            file="$(mktemp)"
+            printf '%s' "$value" > "$file"
+            az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "$name" --file "$file" --only-show-errors --output none
+            rm -f "$file"
+          }
+
+          for service in auth customer inventory order invoice payment; do
+            set_secret "opslora-prod-${service}-database-url" "$database_url"
+            set_secret "opslora-prod-${service}-jwt-secret-key" "$jwt_secret"
+            set_secret "opslora-prod-${service}-environment" "production"
+            set_secret "opslora-prod-${service}-access-token-expire-minutes" "15"
+            set_secret "opslora-prod-${service}-api-url" "$API_URL"
+            set_secret "opslora-prod-${service}-rabbitmq-url" "$rabbit_url"
+          done
+
+          set_secret "opslora-prod-rabbitmq-default-user" "$RABBIT_USER"
+          set_secret "opslora-prod-rabbitmq-default-pass" "$rabbit_password"
+          set_secret "opslora-prod-notification-rabbitmq-url" "$rabbit_url"
+          set_secret "opslora-prod-notification-smtp-host" "$SMTP_HOST"
+          set_secret "opslora-prod-notification-smtp-port" "$SMTP_PORT"
+          set_secret "opslora-prod-notification-smtp-user" "$SMTP_USER"
+          set_secret "opslora-prod-notification-smtp-pass" "$SMTP_PASS"
+          set_secret "opslora-prod-notification-smtp-starttls" "$SMTP_STARTTLS"
+          set_secret "opslora-prod-notification-from-email" "$FROM_EMAIL"
+          set_secret "opslora-prod-notification-from-name" "$FROM_NAME"
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: ${{ env.AKS_RG }}
+          cluster-name: ${{ env.AKS_NAME }}
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
+      - name: Set up yq
+        shell: bash
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          yq --version
+
+      - name: Deploy Helm charts
+        shell: bash
+        run: |
+          set -euo pipefail
+          namespace="${{ inputs.namespace }}"
+          git clone --branch azure/agic-application-gateway --depth 1 https://github.com/KUBE-POD404/opslora-helm-charts.git /tmp/opslora-helm-charts
+          cd /tmp/opslora-helm-charts
+
+          patch_data_service() {
+            local service="$1"
+            local tag="$2"
+            export service tag
+            local file="opslora-helm/apps/${service}/values-azure-prod.yaml"
+            yq -i '
+              .image.tag = strenv(tag) |
+              .azureKeyVault.enabled = true |
+              .azureKeyVault.keyVaultName = strenv(KEY_VAULT_NAME) |
+              .azureKeyVault.tenantId = strenv(AZURE_TENANT_ID) |
+              .azureKeyVault.identityClientId = strenv(AKS_KV_IDENTITY_CLIENT_ID) |
+              .azureKeyVault.secretProviderClassName = "spc-opslora-prod-" + strenv(service) |
+              .azureKeyVault.secrets = [
+                {"objectName": "opslora-prod-" + strenv(service) + "-database-url", "envName": "DATABASE_URL"},
+                {"objectName": "opslora-prod-" + strenv(service) + "-jwt-secret-key", "envName": "JWT_SECRET_KEY"},
+                {"objectName": "opslora-prod-" + strenv(service) + "-environment", "envName": "ENVIRONMENT"},
+                {"objectName": "opslora-prod-" + strenv(service) + "-access-token-expire-minutes", "envName": "ACCESS_TOKEN_EXPIRE_MINUTES"},
+                {"objectName": "opslora-prod-" + strenv(service) + "-api-url", "envName": "API_URL"},
+                {"objectName": "opslora-prod-" + strenv(service) + "-rabbitmq-url", "envName": "RABBITMQ_URL"}
+              ] |
+              .sealedSecret.enabled = false
+            ' "$file"
+          }
+
+          patch_data_service auth "${{ inputs.auth_tag }}"
+          patch_data_service customer "${{ inputs.customer_tag }}"
+          patch_data_service inventory "${{ inputs.inventory_tag }}"
+          patch_data_service order "${{ inputs.order_tag }}"
+          patch_data_service invoice "${{ inputs.invoice_tag }}"
+          patch_data_service payment "${{ inputs.payment_tag }}"
+
+          cp opslora-helm/apps/notification/values-azure-test.yaml opslora-helm/apps/notification/values-azure-prod.yaml
+          tag="${{ inputs.notification_tag }}" service=notification yq -i '
+            .image.tag = strenv(tag) |
+            .azureKeyVault.enabled = true |
+            .azureKeyVault.keyVaultName = strenv(KEY_VAULT_NAME) |
+            .azureKeyVault.tenantId = strenv(AZURE_TENANT_ID) |
+            .azureKeyVault.identityClientId = strenv(AKS_KV_IDENTITY_CLIENT_ID) |
+            .azureKeyVault.secretProviderClassName = "spc-opslora-prod-notification" |
+            .azureKeyVault.secrets = [
+              {"objectName": "opslora-prod-notification-rabbitmq-url", "envName": "RABBITMQ_URL"},
+              {"objectName": "opslora-prod-notification-smtp-host", "envName": "SMTP_HOST"},
+              {"objectName": "opslora-prod-notification-smtp-port", "envName": "SMTP_PORT"},
+              {"objectName": "opslora-prod-notification-smtp-user", "envName": "SMTP_USER"},
+              {"objectName": "opslora-prod-notification-smtp-pass", "envName": "SMTP_PASS"},
+              {"objectName": "opslora-prod-notification-smtp-starttls", "envName": "SMTP_STARTTLS"},
+              {"objectName": "opslora-prod-notification-from-email", "envName": "FROM_EMAIL"},
+              {"objectName": "opslora-prod-notification-from-name", "envName": "FROM_NAME"}
+            ] |
+            .sealedSecret.enabled = false
+          ' opslora-helm/apps/notification/values-azure-prod.yaml
+
+          tag="${{ inputs.frontend_tag }}" yq -i '.image.tag = strenv(tag)' opslora-helm/apps/frontend/values-azure-prod.yaml
+
+          kubectl create namespace "${namespace}" --dry-run=client -o yaml | kubectl apply -f -
+
+          helm upgrade --install rabbitmq-azure-prod opslora-helm/infra/rabbitmq \
+            --namespace "${namespace}" \
+            -f opslora-helm/infra/rabbitmq/values.yaml \
+            -f opslora-helm/infra/rabbitmq/values-azure-prod.yaml \
+            --wait --timeout 10m
+
+          for release in auth customer inventory order invoice payment; do
+            kubectl delete job "${release}-migrate" -n "${namespace}" --ignore-not-found
+            kubectl delete job "${release}-service-migrate" -n "${namespace}" --ignore-not-found
+          done
+
+          for chart in auth customer inventory order invoice payment frontend notification; do
+            helm upgrade --install "${chart}" "opslora-helm/apps/${chart}" \
+              --namespace "${namespace}" \
+              -f "opslora-helm/apps/${chart}/values.yaml" \
+              -f "opslora-helm/apps/${chart}/values-azure-prod.yaml" \
+              --wait --timeout 10m
+          done

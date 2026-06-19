@@ -25,3 +25,8 @@ output "aks_key_vault_secrets_provider_client_id" {
 output "mysql_fqdn" {
   value = module.mysql.fqdn
 }
+
+output "mysql_administrator_password" {
+  value     = module.mysql.administrator_password
+  sensitive = true
+}
