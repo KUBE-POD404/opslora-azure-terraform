@@ -82,6 +82,7 @@ For GitHub Actions, configure these repository or environment secrets:
 | `AZURE_TEST_CLIENT_ID` | Test Terraform OIDC identity |
 | `AZURE_TEST_SUBSCRIPTION_ID` | Test subscription |
 | `AZURE_AKS_SSH_PUBLIC_KEY` | Test AKS Linux profile |
+| `TEST_SMTP_PASS` | Hostinger SMTP password for test notification secret seeding |
 
 ## GitHub Actions Terraform Pipelines
 
@@ -96,6 +97,7 @@ Workflows:
 | `Azure Hub Terraform Apply` | manual only | `environments/hub` | Re-plans and applies hub changes after typed confirmation. |
 | `Azure Test Terraform Plan` | pull request, manual, or after successful hub apply | `environments/test` | Formats, initializes, validates, and uploads a test plan artifact. |
 | `Azure Test Terraform Apply` | manual only | `environments/test` | Re-plans and applies test changes after typed confirmation. |
+| `Azure Test Seed Secrets` | manual only | test Key Vault | Seeds or refreshes test runtime secrets without redeploying apps. |
 
 Apply workflows require a typed confirmation:
 
@@ -133,6 +135,14 @@ Recommended first run order:
 4. Wait for the automatic `Azure Test Terraform Plan` run.
 5. Review the uploaded `test-tfplan-*` artifact.
 6. Run `Azure Test Terraform Apply` with `apply-test`.
+7. Run `Azure Test Seed Secrets`.
+8. Run `Azure Test Bootstrap and Helm Deploy` when app redeployment is needed.
+
+`Azure Test Seed Secrets` temporarily enables public Key Vault access by default
+so a GitHub-hosted runner can write test secrets, then disables it again at the
+end of the job. It preserves existing JWT and RabbitMQ secrets by default. Use
+`rotate_runtime_secrets=true` only when you intentionally want to rotate those
+values.
 
 The workflows pin Terraform CLI to `1.12.2`. If provider lock files need to be
 refreshed, do it in a clean runner/VM and commit the updated lock files with
