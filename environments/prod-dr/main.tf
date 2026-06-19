@@ -148,7 +148,7 @@ module "app_gateway" {
 
 module "key_vault" {
   source                     = "../../modules/key-vault"
-  name                       = "kv-${local.prefix}-${local.env}-${var.location_code}-001"
+  name                       = "kv-${local.prefix}-pdr-${var.location_code}-001"
   location                   = var.location
   resource_group_name        = module.resource_groups.names[local.resource_group_names.security]
   tenant_id                  = var.tenant_id
