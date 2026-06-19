@@ -48,7 +48,7 @@ concurrency:
 jobs:
   deploy:
     if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, opslora-prod, private-network]
     environment: prod
     env:
       AZURE_PROD_CLIENT_ID: ${{ secrets.AZURE_PROD_CLIENT_ID }}
