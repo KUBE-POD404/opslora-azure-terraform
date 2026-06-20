@@ -55,9 +55,7 @@ jobs:
               exit 1
             fi
             echo "--- repairing ${name} via pod ${pod} ---"
-            kubectl exec -i -n "$namespace" "$pod" -- python - <<PY
-          ${script}
-          PY
+            printf '%s\n' "$script" | kubectl exec -i -n "$namespace" "$pod" -- python -
           }
 
           order_script=$(cat <<'PYCODE'
