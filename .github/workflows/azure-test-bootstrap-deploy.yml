@@ -7,26 +7,6 @@ on:
         description: "Kubernetes namespace"
         required: true
         default: "opslora-app-ns"
-      smtp_host:
-        description: "SMTP host"
-        required: false
-        default: "smtp.example.com"
-      smtp_port:
-        description: "SMTP port"
-        required: false
-        default: "587"
-      smtp_user:
-        description: "SMTP username"
-        required: false
-        default: "not-configured"
-      smtp_pass:
-        description: "SMTP password"
-        required: false
-        default: "not-configured"
-      smtp_starttls:
-        description: "SMTP STARTTLS true/false"
-        required: false
-        default: "true"
 
 permissions:
   id-token: write
@@ -37,25 +17,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  bootstrap-deploy:
+  deploy:
     if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' }}
     runs-on: ubuntu-latest
     env:
       AZURE_CLIENT_ID: 2b46972f-ab16-4860-9fac-ac4811c15b20
       AZURE_TENANT_ID: 7f02300f-0f1b-4237-b981-c376377f394e
       AZURE_TEST_SUBSCRIPTION_ID: 94433754-e73d-429d-85c9-f4cf47043e04
-      KEY_VAULT_NAME: kv-opslora-test-cin-001
-      KEY_VAULT_RG: rg-opslora-test-security-cin
-      TFSTATE_ACCOUNT: stopsloratfstatecin001
-      TFSTATE_CONTAINER: tfstate
-      TFSTATE_BLOB: test/terraform.tfstate
-      MYSQL_HOST: mysql-opslora-test-cin-001.mysql.database.azure.com
-      MYSQL_DATABASE: opslora
-      MYSQL_USER: opsloraadmin
-      RABBIT_USER: opslora
-      FROM_EMAIL: noreply@opslora.com
-      FROM_NAME: Opslora
-      API_URL: https://app-test.opslora.com
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -66,91 +34,6 @@ jobs:
           client-id: ${{ env.AZURE_CLIENT_ID }}
           tenant-id: ${{ env.AZURE_TENANT_ID }}
           subscription-id: ${{ env.AZURE_TEST_SUBSCRIPTION_ID }}
-
-      - name: Bootstrap Key Vault secrets
-        shell: bash
-        run: |
-          set -euo pipefail
-          cleanup() {
-            az keyvault update \
-              --name "$KEY_VAULT_NAME" \
-              --resource-group "$KEY_VAULT_RG" \
-              --public-network-access Disabled \
-              --only-show-errors \
-              --output none || true
-          }
-          trap cleanup EXIT
-
-          az keyvault update \
-            --name "$KEY_VAULT_NAME" \
-            --resource-group "$KEY_VAULT_RG" \
-            --public-network-access Enabled \
-            --only-show-errors \
-            --output none
-
-          az storage blob download \
-            --account-name "$TFSTATE_ACCOUNT" \
-            --container-name "$TFSTATE_CONTAINER" \
-            --name "$TFSTATE_BLOB" \
-            --file /tmp/opslora-test.tfstate \
-            --auth-mode login \
-            --only-show-errors \
-            --output none
-
-          mysql_password="$(jq -r '.resources[] | select(.module=="module.mysql" and .type=="random_password" and .name=="admin") | .instances[0].attributes.result' /tmp/opslora-test.tfstate)"
-          if [[ -z "$mysql_password" || "$mysql_password" == "null" ]]; then
-            echo "MySQL password was not found in Terraform state." >&2
-            exit 1
-          fi
-
-          jwt_secret="$(openssl rand -base64 48)"
-          rabbit_password="$(openssl rand -base64 32)"
-          echo "::add-mask::$rabbit_password"
-          {
-            echo "BOOTSTRAP_RABBIT_USER=$RABBIT_USER"
-            echo "BOOTSTRAP_RABBIT_PASSWORD=$rabbit_password"
-          } >> "$GITHUB_ENV"
-          mysql_user_encoded="$(jq -nr --arg v "$MYSQL_USER" '$v|@uri')"
-          mysql_password_encoded="$(jq -nr --arg v "$mysql_password" '$v|@uri')"
-          rabbit_user_encoded="$(jq -nr --arg v "$RABBIT_USER" '$v|@uri')"
-          rabbit_password_encoded="$(jq -nr --arg v "$rabbit_password" '$v|@uri')"
-          database_url="mysql+pymysql://${mysql_user_encoded}:${mysql_password_encoded}@${MYSQL_HOST}:3306/${MYSQL_DATABASE}?ssl_ca=%2Fetc%2Fssl%2Fcerts%2Fca-certificates.crt"
-          rabbit_url="amqp://${rabbit_user_encoded}:${rabbit_password_encoded}@rabbitmq:5672//"
-
-          set_secret() {
-            local name="$1"
-            local value="$2"
-            local file
-            file="$(mktemp)"
-            printf '%s' "$value" > "$file"
-            az keyvault secret set \
-              --vault-name "$KEY_VAULT_NAME" \
-              --name "$name" \
-              --file "$file" \
-              --only-show-errors \
-              --output none
-            rm -f "$file"
-          }
-
-          for service in auth customer inventory order invoice payment; do
-            set_secret "opslora-test-${service}-database-url" "$database_url"
-            set_secret "opslora-test-${service}-jwt-secret-key" "$jwt_secret"
-            set_secret "opslora-test-${service}-environment" "test"
-            set_secret "opslora-test-${service}-access-token-expire-minutes" "15"
-            set_secret "opslora-test-${service}-api-url" "$API_URL"
-            set_secret "opslora-test-${service}-rabbitmq-url" "$rabbit_url"
-          done
-
-          set_secret "opslora-test-rabbitmq-default-user" "$RABBIT_USER"
-          set_secret "opslora-test-rabbitmq-default-pass" "$rabbit_password"
-          set_secret "opslora-test-notification-rabbitmq-url" "$rabbit_url"
-          set_secret "opslora-test-notification-smtp-host" "${{ github.event.inputs.smtp_host }}"
-          set_secret "opslora-test-notification-smtp-port" "${{ github.event.inputs.smtp_port }}"
-          set_secret "opslora-test-notification-smtp-user" "${{ github.event.inputs.smtp_user }}"
-          set_secret "opslora-test-notification-smtp-pass" "${{ github.event.inputs.smtp_pass }}"
-          set_secret "opslora-test-notification-smtp-starttls" "${{ github.event.inputs.smtp_starttls }}"
-          set_secret "opslora-test-notification-from-email" "$FROM_EMAIL"
-          set_secret "opslora-test-notification-from-name" "$FROM_NAME"
 
       - name: Set AKS context
         uses: azure/aks-set-context@v4
@@ -177,20 +60,17 @@ jobs:
             -f opslora-helm/infra/rabbitmq/values-azure-test.yaml \
             --wait --timeout 10m
 
-          kubectl exec rabbitmq-0 -n "${namespace}" -- rabbitmqctl change_password "${BOOTSTRAP_RABBIT_USER}" "${BOOTSTRAP_RABBIT_PASSWORD}"
-          kubectl exec rabbitmq-0 -n "${namespace}" -- rabbitmqctl set_permissions -p / "${BOOTSTRAP_RABBIT_USER}" ".*" ".*" ".*"
-
-          helm uninstall inventory -n "${namespace}" --ignore-not-found || true
-
-          for release in auth customer inventory order invoice payment; do
+          for release in auth customer inventory order invoice payment frontend notification; do
             kubectl delete job "${release}-migrate" -n "${namespace}" --ignore-not-found
             kubectl delete job "${release}-service-migrate" -n "${namespace}" --ignore-not-found
           done
 
-          for chart in auth customer order invoice payment frontend notification; do
+          for chart in auth customer inventory order invoice payment frontend notification; do
             helm upgrade --install "${chart}" "opslora-helm/apps/${chart}" \
               --namespace "${namespace}" \
               -f "opslora-helm/apps/${chart}/values.yaml" \
               -f "opslora-helm/apps/${chart}/values-azure-test.yaml" \
               --wait --timeout 10m
           done
+
+          kubectl get pods -n "${namespace}" -o wide
