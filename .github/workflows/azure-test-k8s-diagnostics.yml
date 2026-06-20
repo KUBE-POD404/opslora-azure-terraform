@@ -1,0 +1,83 @@
+name: Azure Test Kubernetes Diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: "Kubernetes namespace"
+        required: true
+        default: "opslora-app-ns"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-test-kubernetes-diagnostics
+  cancel-in-progress: true
+
+jobs:
+  diagnostics:
+    if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' }}
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CLIENT_ID: 2b46972f-ab16-4860-9fac-ac4811c15b20
+      AZURE_TENANT_ID: 7f02300f-0f1b-4237-b981-c376377f394e
+      AZURE_TEST_SUBSCRIPTION_ID: 94433754-e73d-429d-85c9-f4cf47043e04
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_TEST_SUBSCRIPTION_ID }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: rg-opslora-test-aks-cin
+          cluster-name: aks-opslora-test-cin-001
+
+      - name: Collect namespace diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          namespace="${{ github.event.inputs.namespace }}"
+          redact='s#(mysql\+pymysql://[^:[:space:]]+):[^@[:space:]]+@#\1:***@#g; s#(amqp://[^:[:space:]]+):[^@[:space:]]+@#\1:***@#g; s#(password|passwd|secret|token|api[_-]?key)=([^[:space:]]+)#\1=***#Ig'
+
+          {
+            echo "## Azure Test Kubernetes Diagnostics"
+            echo
+            echo "Namespace: \`${namespace}\`"
+            echo
+            echo "### Pods"
+            echo '```text'
+            kubectl get pods -n "${namespace}" -o wide | sed -E "$redact" || true
+            echo '```'
+            echo
+            echo "### Helm releases"
+            echo '```text'
+            helm list -n "${namespace}" | sed -E "$redact" || true
+            echo '```'
+            echo
+            echo "### Non-running pods and failed jobs"
+            echo '```text'
+            kubectl get pods -n "${namespace}" --field-selector=status.phase!=Running -o wide | sed -E "$redact" || true
+            kubectl get jobs -n "${namespace}" | sed -E "$redact" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo '--- pods ---'
+          kubectl get pods -n "${namespace}" -o wide | sed -E "$redact" || true
+          echo '--- jobs ---'
+          kubectl get jobs -n "${namespace}" | sed -E "$redact" || true
+
+          mapfile -t problem_pods < <(kubectl get pods -n "${namespace}" --no-headers 2>/dev/null | awk '$3 != "Running" && $3 != "Completed" {print $1}' | head -20)
+          for pod in "${problem_pods[@]}"; do
+            echo "--- describe pod ${pod} ---"
+            kubectl describe pod "$pod" -n "${namespace}" | sed -E "$redact" | tail -160 || true
+            echo "--- logs pod ${pod} --all-containers --previous ---"
+            kubectl logs "$pod" -n "${namespace}" --all-containers --previous --tail=160 2>&1 | sed -E "$redact" || true
+            echo "--- logs pod ${pod} --all-containers current ---"
+            kubectl logs "$pod" -n "${namespace}" --all-containers --tail=160 2>&1 | sed -E "$redact" || true
+          done
