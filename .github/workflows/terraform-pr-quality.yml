@@ -1,0 +1,140 @@
+name: Terraform PR Quality Gates
+
+on:
+  pull_request:
+    branches:
+      - main
+      - azure/hub-test-foundation
+    paths:
+      - "**/*.tf"
+      - "**/*.tfvars"
+      - "**/*.tfvars.example"
+      - ".github/workflows/terraform-pr-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: read
+
+concurrency:
+  group: terraform-pr-quality-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TERRAFORM_VERSION: "1.12.2"
+
+jobs:
+  fmt:
+    name: Terraform fmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive
+
+  validate:
+    name: Validate ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment:
+          - hub
+          - test
+          - prod
+          - prod-dr
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Init without backend
+        working-directory: environments/${{ matrix.environment }}
+        run: terraform init -backend=false
+
+      - name: Validate configuration
+        working-directory: environments/${{ matrix.environment }}
+        run: terraform validate
+
+  static-analysis:
+    name: Terraform security/static analysis
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform
+          soft_fail: false
+          output_format: cli,sarif
+          output_file_path: console,checkov.sarif
+          quiet: true
+
+      - name: Upload Checkov SARIF
+        if: always() && hashFiles('checkov.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov.sarif
+
+      - name: Run Trivy IaC scan
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          scan-type: config
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          format: sarif
+          output: trivy-terraform.sarif
+
+      - name: Upload Trivy SARIF
+        if: always() && hashFiles('trivy-terraform.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-terraform.sarif
+
+  required-gates:
+    name: Terraform required gates
+    runs-on: ubuntu-latest
+    needs:
+      - fmt
+      - validate
+      - static-analysis
+    if: always()
+    steps:
+      - name: Enforce Terraform gates
+        run: |
+          failures=0
+          for job in \
+            "fmt:${{ needs.fmt.result }}" \
+            "validate:${{ needs.validate.result }}" \
+            "static-analysis:${{ needs.static-analysis.result }}"; do
+            name="${job%%:*}"
+            result="${job#*:}"
+            echo "$name => $result"
+            if [ "$result" != "success" ]; then
+              failures=$((failures + 1))
+            fi
+          done
+          if [ "$failures" -ne 0 ]; then
+            echo "$failures Terraform gate(s) failed."
+            exit 1
+          fi

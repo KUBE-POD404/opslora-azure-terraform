@@ -47,10 +47,12 @@ module "monitoring" {
 }
 
 module "private_dns" {
-  source              = "../../modules/private-dns"
-  resource_group_name = module.resource_groups.names["rg-${local.prefix}-${local.scope}-dns-${var.location_code}"]
-  hub_vnet_id         = module.hub_network.vnet_id
-  tags                = var.tags
+  source                       = "../../modules/private-dns"
+  resource_group_name          = module.resource_groups.names["rg-${local.prefix}-${local.scope}-dns-${var.location_code}"]
+  hub_vnet_id                  = module.hub_network.vnet_id
+  onprem_private_dns_zone_name = var.onprem_private_dns_zone_name
+  onprem_a_records             = var.onprem_a_records
+  tags                         = var.tags
 }
 
 module "hub_security" {
@@ -90,5 +92,7 @@ module "hub_connectivity" {
   resource_group_name         = module.resource_groups.names["rg-${local.prefix}-${local.scope}-connectivity-${var.location_code}"]
   gateway_resource_group_name = module.resource_groups.names["rg-${local.prefix}-${local.scope}-network-${var.location_code}"]
   gateway_subnet_id           = module.hub_network.subnet_ids["GatewaySubnet"]
+  onprem_sites                = var.onprem_sites
+  onprem_shared_keys          = var.onprem_shared_keys
   tags                        = var.tags
 }

@@ -40,6 +40,7 @@ module "resource_groups" {
   resource_groups = [
     "rg-${local.prefix}-${local.env}-network-${var.location_code}",
     "rg-${local.prefix}-${local.env}-aks-${var.location_code}",
+    "rg-${local.prefix}-${local.env}-registry-${var.location_code}",
     "rg-${local.prefix}-${local.env}-ingress-${var.location_code}",
     "rg-${local.prefix}-${local.env}-data-${var.location_code}",
     "rg-${local.prefix}-${local.env}-security-${var.location_code}",
@@ -124,6 +125,15 @@ module "key_vault" {
   tags                       = var.tags
 }
 
+module "container_registry" {
+  source              = "../../modules/container-registry"
+  name                = "acr${local.prefix}${local.env}${var.location_code}001"
+  location            = var.location
+  resource_group_name = module.resource_groups.names["rg-${local.prefix}-${local.env}-registry-${var.location_code}"]
+  sku                 = "Standard"
+  tags                = var.tags
+}
+
 module "mysql" {
   source              = "../../modules/mysql-flexible"
   name                = "mysql-${local.prefix}-${local.env}-${var.location_code}-001"
@@ -155,6 +165,12 @@ resource "azurerm_role_assignment" "aks_key_vault_secrets_provider" {
   scope                = module.key_vault.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = module.aks.key_vault_secrets_provider_object_id
+}
+
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  scope                = module.container_registry.id
+  role_definition_name = "AcrPull"
+  principal_id         = module.aks.kubelet_identity_object_id
 }
 
 resource "azurerm_role_assignment" "agic_ingress_rg_reader" {

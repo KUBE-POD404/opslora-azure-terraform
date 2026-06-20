@@ -27,3 +27,28 @@ resource "azurerm_virtual_network_gateway" "this" {
     subnet_id                     = var.gateway_subnet_id
   }
 }
+
+resource "azurerm_local_network_gateway" "onprem" {
+  for_each = var.onprem_sites
+
+  name                = "lgw-opslora-${each.key}-${var.location_code}-001"
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  gateway_address     = each.value.gateway_address
+  address_space       = each.value.address_spaces
+  tags                = var.tags
+}
+
+resource "azurerm_virtual_network_gateway_connection" "onprem" {
+  for_each = var.onprem_sites
+
+  name                       = "cn-opslora-hub-${each.key}-${var.location_code}-001"
+  location                   = var.location
+  resource_group_name        = var.gateway_resource_group_name
+  type                       = "IPsec"
+  virtual_network_gateway_id = azurerm_virtual_network_gateway.this.id
+  local_network_gateway_id   = azurerm_local_network_gateway.onprem[each.key].id
+  shared_key                 = var.onprem_shared_keys[each.key]
+
+  tags = var.tags
+}

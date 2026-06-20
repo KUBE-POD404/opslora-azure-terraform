@@ -23,3 +23,30 @@ resource "azurerm_private_dns_zone_virtual_network_link" "hub" {
   tags                  = var.tags
 }
 
+resource "azurerm_private_dns_zone" "onprem" {
+  count               = length(var.onprem_a_records) > 0 ? 1 : 0
+  name                = var.onprem_private_dns_zone_name
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "onprem_hub" {
+  count                 = length(var.onprem_a_records) > 0 ? 1 : 0
+  name                  = "pdnslink-opslora-hub-cin-001-${replace(var.onprem_private_dns_zone_name, ".", "-")}"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.onprem[0].name
+  virtual_network_id    = var.hub_vnet_id
+  registration_enabled  = false
+  tags                  = var.tags
+}
+
+resource "azurerm_private_dns_a_record" "onprem" {
+  for_each            = var.onprem_a_records
+  name                = each.key
+  zone_name           = azurerm_private_dns_zone.onprem[0].name
+  resource_group_name = var.resource_group_name
+  ttl                 = 300
+  records             = [each.value]
+  tags                = var.tags
+}
+

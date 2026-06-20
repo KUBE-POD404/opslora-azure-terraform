@@ -1,0 +1,168 @@
+name: Azure Terraform Import
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: Terraform root to import into.
+        required: true
+        type: choice
+        options:
+          - hub
+          - test
+          - prod
+          - prod-dr
+      resource_address:
+        description: Terraform resource address, e.g. module.aks.azurerm_kubernetes_cluster.this.
+        required: true
+        type: string
+      azure_resource_id:
+        description: Full Azure resource ID to import.
+        required: true
+        type: string
+      confirm_import:
+        description: Type import-azure-resource to update remote Terraform state.
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-import-${{ inputs.target_environment }}
+  cancel-in-progress: false
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TERRAFORM_VERSION: "1.12.2"
+
+jobs:
+  import:
+    name: Import into ${{ inputs.target_environment }} state
+    if: ${{ inputs.confirm_import == 'import-azure-resource' && github.ref == 'refs/heads/azure/hub-test-foundation' }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target_environment }}
+    env:
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_HUB_CLIENT_ID: ${{ secrets.AZURE_HUB_CLIENT_ID }}
+      AZURE_HUB_SUBSCRIPTION_ID: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+      AZURE_TEST_CLIENT_ID: ${{ secrets.AZURE_TEST_CLIENT_ID }}
+      AZURE_TEST_SUBSCRIPTION_ID: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
+      AZURE_PROD_CLIENT_ID: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+      AZURE_PROD_SUBSCRIPTION_ID: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+      AZURE_PROD_DR_CLIENT_ID: ${{ secrets.AZURE_PROD_DR_CLIENT_ID }}
+      AZURE_PROD_DR_SUBSCRIPTION_ID: ${{ secrets.AZURE_PROD_DR_SUBSCRIPTION_ID }}
+      AZURE_AKS_SSH_PUBLIC_KEY: ${{ secrets.AZURE_AKS_SSH_PUBLIC_KEY }}
+      TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_VAR_hub_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+      TF_VAR_ssh_public_key: ${{ secrets.AZURE_AKS_SSH_PUBLIC_KEY }}
+      TF_VAR_enable_rbac_assignments: ${{ vars.ENABLE_RBAC_ASSIGNMENTS || 'false' }}
+      TF_VAR_rbac_group_object_ids: ${{ vars.RBAC_GROUP_OBJECT_IDS || '{}' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve Azure identity for environment
+        id: env
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ inputs.target_environment }}" in
+            hub)
+              client_id="${AZURE_HUB_CLIENT_ID}"
+              subscription_id="${AZURE_HUB_SUBSCRIPTION_ID}"
+              ;;
+            test)
+              client_id="${AZURE_TEST_CLIENT_ID}"
+              subscription_id="${AZURE_TEST_SUBSCRIPTION_ID}"
+              ;;
+            prod)
+              client_id="${AZURE_PROD_CLIENT_ID}"
+              subscription_id="${AZURE_PROD_SUBSCRIPTION_ID}"
+              ;;
+            prod-dr)
+              client_id="${AZURE_PROD_DR_CLIENT_ID:-${AZURE_PROD_CLIENT_ID}}"
+              subscription_id="${AZURE_PROD_DR_SUBSCRIPTION_ID:-${AZURE_PROD_SUBSCRIPTION_ID}}"
+              ;;
+            *)
+              echo "Unsupported environment: ${{ inputs.target_environment }}" >&2
+              exit 1
+              ;;
+          esac
+          missing=()
+          [ -n "${AZURE_TENANT_ID}" ] || missing+=(AZURE_TENANT_ID)
+          [ -n "${client_id}" ] || missing+=(client_id)
+          [ -n "${subscription_id}" ] || missing+=(subscription_id)
+          if (( ${#missing[@]} > 0 )); then
+            printf 'Missing required values for import: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+          echo "client-id=${client_id}" >> "$GITHUB_OUTPUT"
+          echo "subscription-id=${subscription_id}" >> "$GITHUB_OUTPUT"
+          echo "TF_VAR_subscription_id=${subscription_id}" >> "$GITHUB_ENV"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ steps.env.outputs.client-id }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ steps.env.outputs.subscription-id }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform init
+        working-directory: environments/${{ inputs.target_environment }}
+        run: terraform init
+
+      - name: Terraform validate before import
+        working-directory: environments/${{ inputs.target_environment }}
+        run: terraform validate
+
+      - name: Terraform import
+        working-directory: environments/${{ inputs.target_environment }}
+        shell: bash
+        run: |
+          set +e
+          terraform import -input=false -no-color \
+            '${{ inputs.resource_address }}' \
+            '${{ inputs.azure_resource_id }}' 2>&1 | tee tfimport-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Terraform Import (${{ inputs.target_environment }})"
+            echo
+            echo '```text'
+            tail -n 200 tfimport-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Plan after import
+        if: success()
+        working-directory: environments/${{ inputs.target_environment }}
+        shell: bash
+        run: |
+          set +e
+          terraform plan -input=false -no-color 2>&1 | tee tfplan-after-import-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Plan After Import (${{ inputs.target_environment }})"
+            echo
+            echo '```text'
+            tail -n 200 tfplan-after-import-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload import artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-import-${{ inputs.target_environment }}-${{ github.run_id }}
+          path: |
+            environments/${{ inputs.target_environment }}/tfimport-output.txt
+            environments/${{ inputs.target_environment }}/tfplan-after-import-output.txt
+          retention-days: 14

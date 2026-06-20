@@ -4,3 +4,25 @@ tenant_id       = "00000000-0000-0000-0000-000000000000"
 admin_principal_object_ids = [
   "00000000-0000-0000-0000-000000000000"
 ]
+
+# Optional site-to-site VPN peers. Keep real values in an untracked secure tfvars
+# file or GitHub Actions variables/secrets. Do not commit real shared keys.
+onprem_sites = {
+  ai-trivandrum = {
+    gateway_address = "203.0.113.10"
+    address_spaces  = ["172.16.10.0/24"]
+  }
+}
+
+onprem_shared_keys = {
+  ai-trivandrum = "REPLACE_WITH_SECURE_SHARED_KEY_OUTSIDE_GIT"
+}
+
+# Optional stable private DNS contract for AKS/app workloads. These records are
+# created in Azure Private DNS and resolve from the hub/spoke VNets; traffic still
+# routes over the VPN to the on-prem subnet. Keep the IPs private/static.
+onprem_private_dns_zone_name = "onprem.opslora.internal"
+
+onprem_a_records = {
+  ai-gateway = "172.16.10.10"
+}

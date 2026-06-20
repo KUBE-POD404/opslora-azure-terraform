@@ -14,6 +14,14 @@ output "private_dns_zone_ids" {
   value = module.private_dns.zone_ids
 }
 
+output "onprem_private_dns_zone_name" {
+  value = module.private_dns.onprem_zone_name
+}
+
+output "onprem_private_dns_a_records" {
+  value = module.private_dns.onprem_a_records
+}
+
 output "log_analytics_workspace_id" {
   value = module.monitoring.workspace_id
 }
