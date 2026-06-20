@@ -1,0 +1,81 @@
+name: Azure Test Service Logs
+
+on:
+  workflow_dispatch:
+    inputs:
+      namespace:
+        description: "Kubernetes namespace"
+        required: true
+        default: "opslora-app-ns"
+      services:
+        description: "Space-separated release/service selectors to inspect"
+        required: true
+        default: "order payment"
+      tail_lines:
+        description: "Log lines per pod/container"
+        required: true
+        default: "250"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-test-service-logs
+  cancel-in-progress: false
+
+jobs:
+  logs:
+    if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' }}
+    runs-on: ubuntu-latest
+    env:
+      AZURE_CLIENT_ID: 2b46972f-ab16-4860-9fac-ac4811c15b20
+      AZURE_TENANT_ID: 7f02300f-0f1b-4237-b981-c376377f394e
+      AZURE_TEST_SUBSCRIPTION_ID: 94433754-e73d-429d-85c9-f4cf47043e04
+    steps:
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_TEST_SUBSCRIPTION_ID }}
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v4
+        with:
+          resource-group: rg-opslora-test-aks-cin
+          cluster-name: aks-opslora-test-cin-001
+
+      - name: Collect targeted service logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          namespace="${{ github.event.inputs.namespace }}"
+          services="${{ github.event.inputs.services }}"
+          tail_lines="${{ github.event.inputs.tail_lines }}"
+          redact='s#(mysql\+pymysql://[^:[:space:]]+):[^@[:space:]]+@#\1:***@#g; s#(amqp://[^:[:space:]]+):[^@[:space:]]+@#\1:***@#g; s#(Bearer )[A-Za-z0-9._~+/-]+=*#\1***#g; s#(password|passwd|secret|token|api[_-]?key)[=:]([^[:space:]]+)#\1=***#Ig'
+
+          echo "--- namespace objects ---"
+          kubectl get pods,svc,ingress,httproute,gateway -n "${namespace}" -o wide 2>&1 | sed -E "$redact" || true
+          echo "--- recent events ---"
+          kubectl get events -n "${namespace}" --sort-by=.lastTimestamp 2>&1 | tail -120 | sed -E "$redact" || true
+
+          for service in ${services}; do
+            echo "=== SERVICE ${service} ==="
+            echo "--- helm status ${service} ---"
+            helm status "${service}" -n "${namespace}" 2>&1 | sed -E "$redact" || true
+            echo "--- pods by instance=${service} ---"
+            kubectl get pods -n "${namespace}" -l "app.kubernetes.io/instance=${service}" -o wide 2>&1 | sed -E "$redact" || true
+            mapfile -t pods < <(kubectl get pods -n "${namespace}" -l "app.kubernetes.io/instance=${service}" --no-headers 2>/dev/null | awk '{print $1}')
+            if [[ ${#pods[@]} -eq 0 ]]; then
+              mapfile -t pods < <(kubectl get pods -n "${namespace}" --no-headers 2>/dev/null | awk -v s="$service" '$1 ~ s {print $1}')
+            fi
+            for pod in "${pods[@]}"; do
+              echo "--- describe ${pod} ---"
+              kubectl describe pod "${pod}" -n "${namespace}" 2>&1 | sed -E "$redact" | tail -220 || true
+              echo "--- current logs ${pod} ---"
+              kubectl logs "${pod}" -n "${namespace}" --all-containers --tail="${tail_lines}" 2>&1 | sed -E "$redact" || true
+              echo "--- previous logs ${pod} ---"
+              kubectl logs "${pod}" -n "${namespace}" --all-containers --previous --tail="${tail_lines}" 2>&1 | sed -E "$redact" || true
+            done
+          done
