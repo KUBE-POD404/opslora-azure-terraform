@@ -70,6 +70,20 @@ jobs:
       SMTP_STARTTLS: "true"
       FROM_EMAIL: notification@opslora.com
       FROM_NAME: Opslora
+      LORA_AI_DATABASE_URL: sqlite:////data/lora_ai.db
+      LORA_AI_API_PREFIX: /api/v1
+      LORA_AI_PRIMARY_AI_PROVIDER: ollama
+      LORA_AI_ENABLE_AZURE_FOUNDRY_FALLBACK: ${{ vars.PROD_ENABLE_AZURE_FOUNDRY_FALLBACK || 'false' }}
+      LORA_AI_HERMES_BASE_URL: ${{ vars.PROD_HERMES_BASE_URL || 'http://opslora-ai-gateway.opslora-app-ns.svc.cluster.local:8080' }}
+      LORA_AI_HERMES_API_KEY: ${{ secrets.PROD_HERMES_API_KEY }}
+      LORA_AI_HERMES_MODEL: ${{ vars.PROD_HERMES_MODEL || 'smollm2:135m' }}
+      LORA_AI_HERMES_TIMEOUT_SECONDS: ${{ vars.PROD_HERMES_TIMEOUT_SECONDS || '20' }}
+      LORA_AI_VECTOR_URL: ${{ vars.PROD_VECTOR_URL || 'http://qdrant.opslora-app-ns.svc.cluster.local:6333' }}
+      LORA_AI_VECTOR_API_KEY: ${{ secrets.PROD_VECTOR_API_KEY }}
+      LORA_AI_AZURE_FOUNDRY_ENDPOINT: ${{ vars.PROD_AZURE_AI_FOUNDRY_ENDPOINT || 'not-configured' }}
+      LORA_AI_AZURE_FOUNDRY_API_KEY: ${{ secrets.PROD_AZURE_AI_FOUNDRY_API_KEY || 'not-configured' }}
+      LORA_AI_AZURE_FOUNDRY_DEPLOYMENT: ${{ vars.PROD_AZURE_AI_FOUNDRY_DEPLOYMENT || 'not-configured' }}
+      LORA_AI_AZURE_FOUNDRY_TIMEOUT_SECONDS: ${{ vars.PROD_AZURE_AI_FOUNDRY_TIMEOUT_SECONDS || '30' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -85,6 +99,16 @@ jobs:
           done
           if [[ "${{ inputs.bootstrap_secrets }}" == "true" && -z "${SMTP_PASS:-}" ]]; then
             missing+=("PROD_SMTP_PASS")
+          fi
+          if [[ "${{ inputs.bootstrap_secrets }}" == "true" ]]; then
+            for name in LORA_AI_HERMES_API_KEY LORA_AI_VECTOR_API_KEY; do
+              if [[ -z "${!name:-}" ]]; then
+                case "$name" in
+                  LORA_AI_HERMES_API_KEY) missing+=("PROD_HERMES_API_KEY") ;;
+                  LORA_AI_VECTOR_API_KEY) missing+=("PROD_VECTOR_API_KEY") ;;
+                esac
+              fi
+            done
           fi
           if (( ${#missing[@]} > 0 )); then
             printf 'Missing required GitHub secrets: %s\n' "${missing[*]}" >&2
@@ -179,6 +203,22 @@ jobs:
           set_secret "opslora-prod-notification-smtp-starttls" "$SMTP_STARTTLS"
           set_secret "opslora-prod-notification-from-email" "$FROM_EMAIL"
           set_secret "opslora-prod-notification-from-name" "$FROM_NAME"
+
+          set_secret "opslora-prod-lora-ai-database-url" "$LORA_AI_DATABASE_URL"
+          set_secret "opslora-prod-lora-ai-environment" "production"
+          set_secret "opslora-prod-lora-ai-api-prefix" "$LORA_AI_API_PREFIX"
+          set_secret "opslora-prod-lora-ai-primary-ai-provider" "$LORA_AI_PRIMARY_AI_PROVIDER"
+          set_secret "opslora-prod-lora-ai-enable-azure-foundry-fallback" "$LORA_AI_ENABLE_AZURE_FOUNDRY_FALLBACK"
+          set_secret "opslora-prod-lora-ai-hermes-base-url" "$LORA_AI_HERMES_BASE_URL"
+          set_secret "opslora-prod-lora-ai-hermes-api-key" "$LORA_AI_HERMES_API_KEY"
+          set_secret "opslora-prod-lora-ai-hermes-model" "$LORA_AI_HERMES_MODEL"
+          set_secret "opslora-prod-lora-ai-hermes-timeout-seconds" "$LORA_AI_HERMES_TIMEOUT_SECONDS"
+          set_secret "opslora-prod-lora-ai-vector-url" "$LORA_AI_VECTOR_URL"
+          set_secret "opslora-prod-lora-ai-vector-api-key" "$LORA_AI_VECTOR_API_KEY"
+          set_secret "opslora-prod-lora-ai-azure-foundry-endpoint" "$LORA_AI_AZURE_FOUNDRY_ENDPOINT"
+          set_secret "opslora-prod-lora-ai-azure-foundry-api-key" "$LORA_AI_AZURE_FOUNDRY_API_KEY"
+          set_secret "opslora-prod-lora-ai-azure-foundry-deployment" "$LORA_AI_AZURE_FOUNDRY_DEPLOYMENT"
+          set_secret "opslora-prod-lora-ai-azure-foundry-timeout-seconds" "$LORA_AI_AZURE_FOUNDRY_TIMEOUT_SECONDS"
 
       - name: Set AKS context
         uses: azure/aks-set-context@v4
