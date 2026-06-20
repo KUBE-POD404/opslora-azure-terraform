@@ -138,12 +138,15 @@ Recommended first run order:
 7. Run `Azure Test Seed Secrets`.
 8. Run `Azure Test Bootstrap and Helm Deploy` when app redeployment is needed.
 
-`Azure Test Seed Secrets` temporarily enables public Key Vault access by default
-so a GitHub-hosted runner can write test secrets, then disables it again at the
-end of the job. It preserves existing JWT and RabbitMQ secrets by default. Use
-`rotate_runtime_secrets=true` only when you intentionally want to rotate those
-values.
+`Azure Test Seed Secrets` runs on a private self-hosted runner with labels
+`self-hosted`, `linux`, `x64`, `opslora-test`, and `private-network`. It no
+longer enables public Key Vault access. The runner must be inside the network
+that can reach the private Key Vault endpoint. The workflow preserves existing
+JWT and RabbitMQ secrets by default; use `rotate_runtime_secrets=true` only when
+you intentionally want to rotate those values.
 
 The workflows pin Terraform CLI to `1.12.2`. If provider lock files need to be
 refreshed, do it in a clean runner/VM and commit the updated lock files with
 checksums for Linux runners.
+
+For private runner setup, see `docs/private-self-hosted-runner.md`.
