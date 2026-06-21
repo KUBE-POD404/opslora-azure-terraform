@@ -95,7 +95,15 @@ jobs:
 
           echo "### Rollout status" >> "$GITHUB_STEP_SUMMARY"
           echo '```text' >> "$GITHUB_STEP_SUMMARY"
-          kubectl rollout status deployment --all -n "${namespace}" --timeout=5m 2>&1 | tee /tmp/rollout-status.txt
+          deployments=$(kubectl get deployments -n "${namespace}" -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+          if [ -z "$deployments" ]; then
+            echo "No deployments found in namespace ${namespace}" >&2
+            exit 1
+          fi
+          while IFS= read -r deployment; do
+            [ -z "$deployment" ] && continue
+            kubectl rollout status "deployment/${deployment}" -n "${namespace}" --timeout=5m
+          done <<< "$deployments" 2>&1 | tee /tmp/rollout-status.txt
           cat /tmp/rollout-status.txt >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           echo >> "$GITHUB_STEP_SUMMARY"
