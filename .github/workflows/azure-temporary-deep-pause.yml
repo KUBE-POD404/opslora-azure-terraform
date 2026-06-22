@@ -1,0 +1,139 @@
+name: Azure Temporary Deep Pause
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type deep-pause to delete/deallocate remaining expensive reversible hub/test resources."
+        required: true
+        type: string
+      delete_bastion:
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      delete_vpn_gateway:
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      delete_dns_resolver:
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      delete_grafana:
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-temporary-deep-pause
+  cancel-in-progress: false
+
+jobs:
+  deep-pause-hub:
+    if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' && inputs.confirm == 'deep-pause' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login hub
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_HUB_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+
+      - name: Delete/deallocate remaining expensive hub resources
+        shell: bash
+        env:
+          DELETE_BASTION: ${{ inputs.delete_bastion }}
+          DELETE_VPN_GATEWAY: ${{ inputs.delete_vpn_gateway }}
+          DELETE_DNS_RESOLVER: ${{ inputs.delete_dns_resolver }}
+          DELETE_GRAFANA: ${{ inputs.delete_grafana }}
+        run: |
+          set -euo pipefail
+          az config set extension.use_dynamic_install=yes_without_prompt >/dev/null
+
+          echo "# Azure Temporary Deep Pause - hub"
+          echo "Deleting Terraform-managed expensive runtime services. Terraform can recreate them later."
+          echo
+
+          show_or_missing() {
+            local label="$1"; shift
+            echo "## ${label}"
+            "$@" || echo "${label}: missing or not readable"
+          }
+
+          echo "## Before inventory"
+          show_or_missing "Bastion" az network bastion show -g rg-opslora-hub-management-cin -n bas-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku.name}' -o json
+          show_or_missing "VPN gateway" az network vnet-gateway show -g rg-opslora-hub-network-cin -n vpngw-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku.name}' -o json
+          show_or_missing "DNS resolver" az dns-resolver show -g rg-opslora-hub-dns-cin -n dnspr-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState}' -o json
+          show_or_missing "Hub Grafana" az grafana show -g rg-opslora-hub-monitoring-cin -n amg-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku.name}' -o json
+
+          if [[ "${DELETE_GRAFANA}" == "true" ]]; then
+            echo "## Deleting hub Managed Grafana"
+            az grafana delete -g rg-opslora-hub-monitoring-cin -n amg-opslora-hub-cin-001 --yes || echo "Hub Grafana already absent or delete failed non-fatally"
+          else
+            echo "## Skipping hub Managed Grafana"
+          fi
+
+          if [[ "${DELETE_DNS_RESOLVER}" == "true" ]]; then
+            echo "## Deleting Private DNS Resolver endpoints and resolver"
+            az dns-resolver inbound-endpoint delete -g rg-opslora-hub-dns-cin --dns-resolver-name dnspr-opslora-hub-cin-001 -n dnspr-in-opslora-hub-cin-001 --yes || echo "Inbound endpoint already absent or delete failed non-fatally"
+            az dns-resolver outbound-endpoint delete -g rg-opslora-hub-dns-cin --dns-resolver-name dnspr-opslora-hub-cin-001 -n dnspr-out-opslora-hub-cin-001 --yes || echo "Outbound endpoint already absent or delete failed non-fatally"
+            az dns-resolver delete -g rg-opslora-hub-dns-cin -n dnspr-opslora-hub-cin-001 --yes || echo "Resolver already absent or delete failed non-fatally"
+          else
+            echo "## Skipping Private DNS Resolver"
+          fi
+
+          if [[ "${DELETE_BASTION}" == "true" ]]; then
+            echo "## Deleting Bastion host"
+            az network bastion delete -g rg-opslora-hub-management-cin -n bas-opslora-hub-cin-001 || echo "Bastion already absent or delete failed non-fatally"
+          else
+            echo "## Skipping Bastion"
+          fi
+
+          if [[ "${DELETE_VPN_GATEWAY}" == "true" ]]; then
+            echo "## Deleting VPN gateway connections"
+            mapfile -t conn_ids < <(az network vpn-connection list -g rg-opslora-hub-network-cin --query '[].id' -o tsv 2>/dev/null || true)
+            for conn_id in "${conn_ids[@]}"; do
+              echo "Deleting VPN connection ${conn_id}"
+              az network vpn-connection delete --ids "${conn_id}" || echo "VPN connection delete failed non-fatally: ${conn_id}"
+            done
+            echo "## Deleting VPN gateway"
+            az network vnet-gateway delete -g rg-opslora-hub-network-cin -n vpngw-opslora-hub-cin-001 || echo "VPN gateway already absent or delete failed non-fatally"
+          else
+            echo "## Skipping VPN gateway"
+          fi
+
+          echo "## After inventory"
+          show_or_missing "Bastion" az network bastion show -g rg-opslora-hub-management-cin -n bas-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku.name}' -o json
+          show_or_missing "VPN gateway" az network vnet-gateway show -g rg-opslora-hub-network-cin -n vpngw-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku.name}' -o json
+          show_or_missing "DNS resolver" az dns-resolver show -g rg-opslora-hub-dns-cin -n dnspr-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState}' -o json
+          show_or_missing "Hub Grafana" az grafana show -g rg-opslora-hub-monitoring-cin -n amg-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku.name}' -o json
+
+  deep-pause-test-grafana:
+    if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' && inputs.confirm == 'deep-pause' && inputs.delete_grafana == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login test
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_TEST_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
+
+      - name: Delete test Managed Grafana if present
+        shell: bash
+        run: |
+          set -euo pipefail
+          az config set extension.use_dynamic_install=yes_without_prompt >/dev/null
+          echo "# Azure Temporary Deep Pause - test Grafana"
+          az grafana show -g rg-opslora-test-monitoring-cin -n amg-opslora-test-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku.name}' -o json || echo "Test Grafana not present"
+          az grafana delete -g rg-opslora-test-monitoring-cin -n amg-opslora-test-cin-001 --yes || echo "Test Grafana already absent or delete failed non-fatally"
+          az grafana show -g rg-opslora-test-monitoring-cin -n amg-opslora-test-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku.name}' -o json || echo "Test Grafana missing after delete"
