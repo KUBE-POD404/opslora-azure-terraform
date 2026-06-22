@@ -75,7 +75,8 @@ jobs:
             }')
             echo "### ${label} Cost ${TIMEFRAME}"
             set +e
-            az costmanagement query --scope "${scope}" --type ActualCost --timeframe "${TIMEFRAME}" --dataset "${dataset}" -o json > "/tmp/${label}-cost.json" 2> "/tmp/${label}-cost.err"
+            body=$(jq -nc --arg timeframe "${TIMEFRAME}" --argjson dataset "${dataset}" '{type:"ActualCost", timeframe:$timeframe, dataset:$dataset}')
+            az rest --method post --uri "https://management.azure.com${scope}/providers/Microsoft.CostManagement/query?api-version=2023-11-01" --body "${body}" -o json > "/tmp/${label}-cost.json" 2> "/tmp/${label}-cost.err"
             local status=$?
             set -e
             if [[ ${status} -ne 0 ]]; then
@@ -149,7 +150,8 @@ jobs:
             }')
             echo "### ${label} Cost ${TIMEFRAME}"
             set +e
-            az costmanagement query --scope "${scope}" --type ActualCost --timeframe "${TIMEFRAME}" --dataset "${dataset}" -o json > "/tmp/${label}-cost.json" 2> "/tmp/${label}-cost.err"
+            body=$(jq -nc --arg timeframe "${TIMEFRAME}" --argjson dataset "${dataset}" '{type:"ActualCost", timeframe:$timeframe, dataset:$dataset}')
+            az rest --method post --uri "https://management.azure.com${scope}/providers/Microsoft.CostManagement/query?api-version=2023-11-01" --body "${body}" -o json > "/tmp/${label}-cost.json" 2> "/tmp/${label}-cost.err"
             local status=$?
             set -e
             if [[ ${status} -ne 0 ]]; then
