@@ -40,8 +40,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Install jq and Azure cost extension
+        run: |
+          sudo apt-get update && sudo apt-get install -y jq
+          az extension add --name costmanagement --only-show-errors || true
 
       - name: Azure login test
         uses: azure/login@v2
