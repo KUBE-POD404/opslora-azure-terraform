@@ -1,0 +1,106 @@
+name: Azure Test Temporary Stop
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type stop-test to stop/deallocate reversible test resources."
+        required: true
+        type: string
+      stop_aks:
+        description: "Stop AKS cluster"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      stop_mysql:
+        description: "Stop MySQL Flexible Server"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      stop_app_gateway:
+        description: "Stop Application Gateway"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-test-temporary-stop
+  cancel-in-progress: false
+
+jobs:
+  temporary-stop:
+    if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' && inputs.confirm == 'stop-test' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login test
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_TEST_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
+
+      - name: Stop reversible test resources
+        shell: bash
+        env:
+          STOP_AKS: ${{ inputs.stop_aks }}
+          STOP_MYSQL: ${{ inputs.stop_mysql }}
+          STOP_APP_GATEWAY: ${{ inputs.stop_app_gateway }}
+        run: |
+          set -euo pipefail
+
+          echo "# Azure Test Temporary Stop"
+          echo
+          echo "This stops reversible test resources only. It does not delete hub firewall, VPN gateway, Bastion, DNS, VNets, Key Vault, or ACR."
+          echo
+
+          if [[ "${STOP_APP_GATEWAY}" == "true" ]]; then
+            echo "## Stopping Application Gateway agw-opslora-test-cin-001"
+            az network application-gateway stop \
+              --resource-group rg-opslora-test-ingress-cin \
+              --name agw-opslora-test-cin-001
+          else
+            echo "## Skipping Application Gateway"
+          fi
+
+          if [[ "${STOP_AKS}" == "true" ]]; then
+            echo "## Stopping AKS aks-opslora-test-cin-001"
+            az aks stop \
+              --resource-group rg-opslora-test-aks-cin \
+              --name aks-opslora-test-cin-001 \
+              --no-wait
+          else
+            echo "## Skipping AKS"
+          fi
+
+          if [[ "${STOP_MYSQL}" == "true" ]]; then
+            echo "## Stopping MySQL Flexible Server mysql-opslora-test-cin-001"
+            az mysql flexible-server stop \
+              --resource-group rg-opslora-test-data-cin \
+              --name mysql-opslora-test-cin-001 \
+              --yes
+          else
+            echo "## Skipping MySQL"
+          fi
+
+          echo "## Final status poll"
+          for i in {1..30}; do
+            echo "--- poll ${i} ---"
+            az aks show -g rg-opslora-test-aks-cin -n aks-opslora-test-cin-001 --query '{name:name,powerState:powerState.code,provisioningState:provisioningState}' -o json || true
+            az mysql flexible-server show -g rg-opslora-test-data-cin -n mysql-opslora-test-cin-001 --query '{name:name,state:state}' -o json || true
+            az network application-gateway show -g rg-opslora-test-ingress-cin -n agw-opslora-test-cin-001 --query '{name:name,operationalState:operationalState,provisioningState:provisioningState}' -o json || true
+            aks_state=$(az aks show -g rg-opslora-test-aks-cin -n aks-opslora-test-cin-001 --query powerState.code -o tsv 2>/dev/null || true)
+            mysql_state=$(az mysql flexible-server show -g rg-opslora-test-data-cin -n mysql-opslora-test-cin-001 --query state -o tsv 2>/dev/null || true)
+            appgw_state=$(az network application-gateway show -g rg-opslora-test-ingress-cin -n agw-opslora-test-cin-001 --query operationalState -o tsv 2>/dev/null || true)
+            if [[ "${aks_state}" == "Stopped" && "${mysql_state}" == "Stopped" && "${appgw_state}" == "Stopped" ]]; then
+              echo "All selected resources stopped."
+              break
+            fi
+            sleep 20
+          done
