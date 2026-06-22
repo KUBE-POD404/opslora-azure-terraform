@@ -93,7 +93,15 @@ jobs:
 
           if [[ "${DELETE_BASTION}" == "true" ]]; then
             echo "## Deleting Bastion host"
-            az network bastion delete -g rg-opslora-hub-management-cin -n bas-opslora-hub-cin-001 || echo "Bastion already absent or delete failed non-fatally"
+            if ! az network bastion delete -g rg-opslora-hub-management-cin -n bas-opslora-hub-cin-001; then
+              echo "Bastion CLI delete failed; trying ARM resource delete fallback"
+              bastion_id=$(az network bastion show -g rg-opslora-hub-management-cin -n bas-opslora-hub-cin-001 --query id -o tsv 2>/dev/null || true)
+              if [[ -n "${bastion_id}" ]]; then
+                az resource delete --ids "${bastion_id}" || echo "Bastion ARM resource delete failed non-fatally"
+              else
+                echo "Bastion already absent"
+              fi
+            fi
           else
             echo "## Skipping Bastion"
           fi
