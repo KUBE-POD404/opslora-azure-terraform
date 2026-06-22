@@ -34,11 +34,6 @@ jobs:
     if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' }}
     runs-on: ubuntu-latest
     env:
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_HUB_CLIENT_ID: ${{ secrets.AZURE_HUB_CLIENT_ID }}
-      AZURE_HUB_SUBSCRIPTION_ID: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
-      AZURE_TEST_CLIENT_ID: ${{ secrets.AZURE_TEST_CLIENT_ID }}
-      AZURE_TEST_SUBSCRIPTION_ID: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
       TIMEFRAME: ${{ inputs.timeframe }}
       INCLUDE_RESOURCE_INVENTORY: ${{ inputs.include_resource_inventory }}
     steps:
@@ -48,29 +43,20 @@ jobs:
       - name: Install jq
         run: sudo apt-get update && sudo apt-get install -y jq
 
-      - name: Query costs and inventory
+      - name: Azure login test
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_TEST_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
+
+      - name: Query test costs and inventory
         shell: bash
+        env:
+          AZURE_TEST_SUBSCRIPTION_ID: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
         run: |
           set -euo pipefail
-
-          redact() {
-            sed -E 's#(password|passwd|secret|token|api[_-]?key)[=:]([^[:space:]]+)#\1=***#Ig'
-          }
-
-          login_subscription() {
-            local label="$1"
-            local client_id="$2"
-            local subscription_id="$3"
-            echo "### Login ${label}"
-            az logout >/dev/null 2>&1 || true
-            az login --service-principal \
-              --tenant "${AZURE_TENANT_ID}" \
-              --username "${client_id}" \
-              --federated-token "${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" >/dev/null
-            az account set --subscription "${subscription_id}"
-            az account show --query '{name:name,id:id,tenantId:tenantId}' -o json | jq .
-          }
-
+          redact() { sed -E 's#(password|passwd|secret|token|api[_-]?key)[=:]([^[:space:]]+)#\1=***#Ig'; }
           query_costs() {
             local label="$1"
             local subscription_id="$2"
@@ -83,18 +69,11 @@ jobs:
                 { type: "Dimension", name: "ResourceGroupName" },
                 { type: "Dimension", name: "ResourceType" },
                 { type: "Dimension", name: "ResourceId" }
-              ],
-              sorting: [ { direction: "descending", name: "PreTaxCost" } ]
+              ]
             }')
-
             echo "### ${label} Cost ${TIMEFRAME}"
             set +e
-            az costmanagement query \
-              --scope "${scope}" \
-              --type ActualCost \
-              --timeframe "${TIMEFRAME}" \
-              --dataset "${dataset}" \
-              -o json > "/tmp/${label}-cost.json" 2> "/tmp/${label}-cost.err"
+            az costmanagement query --scope "${scope}" --type ActualCost --timeframe "${TIMEFRAME}" --dataset "${dataset}" -o json > "/tmp/${label}-cost.json" 2> "/tmp/${label}-cost.err"
             local status=$?
             set -e
             if [[ ${status} -ne 0 ]]; then
@@ -102,21 +81,18 @@ jobs:
               cat "/tmp/${label}-cost.err" | redact
               return 0
             fi
-
             jq -r '
               .properties.rows
               | sort_by(.[0])
               | reverse
-              | .[0:25]
+              | .[0:30]
               | ("Cost\tRG\tType\tResource"),
                 (.[] | [ (.[0] | tostring), (.[1] // ""), (.[2] // ""), ((.[3] // "") | split("/") | last) ] | @tsv)
             ' "/tmp/${label}-cost.json" | redact
           }
-
           inventory_test() {
             echo "### TEST resource inventory/status"
             az resource list --query '[?starts_with(resourceGroup, `rg-opslora-test-`)].{name:name,type:type,rg:resourceGroup,location:location}' -o table | redact || true
-
             echo "### TEST stoppable candidates"
             echo "AKS:"
             az aks show -g rg-opslora-test-aks-cin -n aks-opslora-test-cin-001 --query '{name:name,powerState:powerState.code,provisioningState:provisioningState,nodeResourceGroup:nodeResourceGroup,kubernetesVersion:kubernetesVersion}' -o json | jq . || true
@@ -125,21 +101,72 @@ jobs:
               echo "AKS node VMSS:"
               az vmss list -g "${node_rg}" --query '[].{name:name,sku:sku.name,capacity:sku.capacity,provisioningState:provisioningState}' -o table || true
             fi
-
             echo "MySQL Flexible Server:"
             az mysql flexible-server show -g rg-opslora-test-data-cin -n mysql-opslora-test-cin-001 --query '{name:name,state:state,sku:sku.name,tier:sku.tier,storage:storage.storageSizeGb,version:version}' -o json | jq . || true
-
             echo "Application Gateway:"
             az network application-gateway show -g rg-opslora-test-ingress-cin -n agw-opslora-test-cin-001 --query '{name:name,operationalState:operationalState,sku:sku,provisioningState:provisioningState}' -o json | jq . || true
-
             echo "ACR:"
             az acr show -g rg-opslora-test-registry-cin -n acropsloratestcin001 --query '{name:name,sku:sku.name,loginServer:loginServer}' -o json | jq . || true
           }
+          {
+            echo "# Azure Cost Diagnostics"
+            echo
+            echo "Timeframe: ${TIMEFRAME}"
+            az account show --query '{name:name,id:id,tenantId:tenantId}' -o json | jq .
+            query_costs test "${AZURE_TEST_SUBSCRIPTION_ID}"
+            if [[ "${INCLUDE_RESOURCE_INVENTORY}" == "true" ]]; then inventory_test; fi
+          } 2>&1 | tee azure-cost-test.txt | redact
 
+      - name: Azure login hub
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_HUB_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+
+      - name: Query hub costs and inventory
+        shell: bash
+        env:
+          AZURE_HUB_SUBSCRIPTION_ID: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+        run: |
+          set -euo pipefail
+          redact() { sed -E 's#(password|passwd|secret|token|api[_-]?key)[=:]([^[:space:]]+)#\1=***#Ig'; }
+          query_costs() {
+            local label="$1"
+            local subscription_id="$2"
+            local scope="/subscriptions/${subscription_id}"
+            local dataset
+            dataset=$(jq -nc '{
+              granularity: "None",
+              aggregation: { totalCost: { name: "PreTaxCost", function: "Sum" } },
+              grouping: [
+                { type: "Dimension", name: "ResourceGroupName" },
+                { type: "Dimension", name: "ResourceType" },
+                { type: "Dimension", name: "ResourceId" }
+              ]
+            }')
+            echo "### ${label} Cost ${TIMEFRAME}"
+            set +e
+            az costmanagement query --scope "${scope}" --type ActualCost --timeframe "${TIMEFRAME}" --dataset "${dataset}" -o json > "/tmp/${label}-cost.json" 2> "/tmp/${label}-cost.err"
+            local status=$?
+            set -e
+            if [[ ${status} -ne 0 ]]; then
+              echo "COST_QUERY_FAILED ${label}"
+              cat "/tmp/${label}-cost.err" | redact
+              return 0
+            fi
+            jq -r '
+              .properties.rows
+              | sort_by(.[0])
+              | reverse
+              | .[0:30]
+              | ("Cost\tRG\tType\tResource"),
+                (.[] | [ (.[0] | tostring), (.[1] // ""), (.[2] // ""), ((.[3] // "") | split("/") | last) ] | @tsv)
+            ' "/tmp/${label}-cost.json" | redact
+          }
           inventory_hub() {
             echo "### HUB resource inventory/status"
             az resource list --query '[?starts_with(resourceGroup, `rg-opslora-hub-`)].{name:name,type:type,rg:resourceGroup,location:location}' -o table | redact || true
-
             echo "### HUB expensive always-on candidates"
             echo "Firewall:"
             az network firewall show -g rg-opslora-hub-network-cin -n fw-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku,threatIntelMode:threatIntelMode}' -o json | jq . || true
@@ -148,28 +175,19 @@ jobs:
             echo "Bastion:"
             az network bastion show -g rg-opslora-hub-management-cin -n bas-opslora-hub-cin-001 --query '{name:name,provisioningState:provisioningState,sku:sku.name}' -o json | jq . || true
           }
-
           {
-            echo "# Azure Cost Diagnostics"
-            echo
-            echo "Timeframe: ${TIMEFRAME}"
-            echo
-            login_subscription "test" "${AZURE_TEST_CLIENT_ID}" "${AZURE_TEST_SUBSCRIPTION_ID}"
-            query_costs "test" "${AZURE_TEST_SUBSCRIPTION_ID}"
-            if [[ "${INCLUDE_RESOURCE_INVENTORY}" == "true" ]]; then
-              inventory_test
-            fi
-            login_subscription "hub" "${AZURE_HUB_CLIENT_ID}" "${AZURE_HUB_SUBSCRIPTION_ID}"
-            query_costs "hub" "${AZURE_HUB_SUBSCRIPTION_ID}"
-            if [[ "${INCLUDE_RESOURCE_INVENTORY}" == "true" ]]; then
-              inventory_hub
-            fi
-          } 2>&1 | tee azure-cost-diagnostics.txt | redact
+            echo "# Azure Cost Diagnostics - hub"
+            az account show --query '{name:name,id:id,tenantId:tenantId}' -o json | jq .
+            query_costs hub "${AZURE_HUB_SUBSCRIPTION_ID}"
+            if [[ "${INCLUDE_RESOURCE_INVENTORY}" == "true" ]]; then inventory_hub; fi
+          } 2>&1 | tee azure-cost-hub.txt | redact
 
       - name: Upload diagnostics artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: azure-cost-diagnostics-${{ github.run_id }}
-          path: azure-cost-diagnostics.txt
+          path: |
+            azure-cost-test.txt
+            azure-cost-hub.txt
           retention-days: 7
