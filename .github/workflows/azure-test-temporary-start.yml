@@ -1,0 +1,105 @@
+name: Azure Test Temporary Start
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type start-test to start reversible test resources."
+        required: true
+        type: string
+      start_mysql:
+        description: "Start MySQL Flexible Server first"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      start_aks:
+        description: "Start AKS cluster"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+      start_app_gateway:
+        description: "Start Application Gateway last"
+        required: true
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-test-temporary-start
+  cancel-in-progress: false
+
+jobs:
+  temporary-start:
+    if: ${{ github.ref == 'refs/heads/azure/hub-test-foundation' && inputs.confirm == 'start-test' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure login test
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_TEST_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
+
+      - name: Start reversible test resources
+        shell: bash
+        env:
+          START_MYSQL: ${{ inputs.start_mysql }}
+          START_AKS: ${{ inputs.start_aks }}
+          START_APP_GATEWAY: ${{ inputs.start_app_gateway }}
+        run: |
+          set -euo pipefail
+
+          echo "# Azure Test Temporary Start"
+          echo
+          echo "Starting reversible test resources in dependency order: MySQL, AKS, Application Gateway."
+          echo
+
+          if [[ "${START_MYSQL}" == "true" ]]; then
+            echo "## Starting MySQL Flexible Server mysql-opslora-test-cin-001"
+            az mysql flexible-server start \
+              --resource-group rg-opslora-test-data-cin \
+              --name mysql-opslora-test-cin-001
+          else
+            echo "## Skipping MySQL"
+          fi
+
+          if [[ "${START_AKS}" == "true" ]]; then
+            echo "## Starting AKS aks-opslora-test-cin-001"
+            az aks start \
+              --resource-group rg-opslora-test-aks-cin \
+              --name aks-opslora-test-cin-001 \
+              --no-wait
+          else
+            echo "## Skipping AKS"
+          fi
+
+          if [[ "${START_APP_GATEWAY}" == "true" ]]; then
+            echo "## Starting Application Gateway agw-opslora-test-cin-001"
+            az network application-gateway start \
+              --resource-group rg-opslora-test-ingress-cin \
+              --name agw-opslora-test-cin-001
+          else
+            echo "## Skipping Application Gateway"
+          fi
+
+          echo "## Final status poll"
+          for i in {1..45}; do
+            echo "--- poll ${i} ---"
+            az aks show -g rg-opslora-test-aks-cin -n aks-opslora-test-cin-001 --query '{name:name,powerState:powerState.code,provisioningState:provisioningState}' -o json || true
+            az mysql flexible-server show -g rg-opslora-test-data-cin -n mysql-opslora-test-cin-001 --query '{name:name,state:state}' -o json || true
+            az network application-gateway show -g rg-opslora-test-ingress-cin -n agw-opslora-test-cin-001 --query '{name:name,operationalState:operationalState,provisioningState:provisioningState}' -o json || true
+            aks_state=$(az aks show -g rg-opslora-test-aks-cin -n aks-opslora-test-cin-001 --query powerState.code -o tsv 2>/dev/null || true)
+            mysql_state=$(az mysql flexible-server show -g rg-opslora-test-data-cin -n mysql-opslora-test-cin-001 --query state -o tsv 2>/dev/null || true)
+            appgw_state=$(az network application-gateway show -g rg-opslora-test-ingress-cin -n agw-opslora-test-cin-001 --query operationalState -o tsv 2>/dev/null || true)
+            if [[ "${aks_state}" == "Running" && "${mysql_state}" == "Ready" && "${appgw_state}" == "Running" ]]; then
+              echo "All selected resources running."
+              break
+            fi
+            sleep 20
+          done
