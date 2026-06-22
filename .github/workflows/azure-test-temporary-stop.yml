@@ -83,8 +83,7 @@ jobs:
             echo "## Stopping MySQL Flexible Server mysql-opslora-test-cin-001"
             az mysql flexible-server stop \
               --resource-group rg-opslora-test-data-cin \
-              --name mysql-opslora-test-cin-001 \
-              --yes
+              --name mysql-opslora-test-cin-001
           else
             echo "## Skipping MySQL"
           fi
