@@ -102,16 +102,42 @@ jobs:
         with:
           sarif_file: checkov.sarif
 
+      - name: Install Trivy
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="0.71.2"
+          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${version}/trivy_${version}_Linux-64bit.tar.gz" -o trivy.tgz
+          tar -xzf trivy.tgz trivy
+          ./trivy version
+
       - name: Run Trivy IaC scan
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          scan-type: config
-          scan-ref: .
-          severity: HIGH,CRITICAL
-          exit-code: "1"
-          trivyignores: .trivyignore
-          format: sarif
-          output: trivy-terraform.sarif
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./trivy config \
+            --severity HIGH,CRITICAL \
+            --exit-code 1 \
+            --ignorefile .trivyignore \
+            --skip-version-check \
+            --format table \
+            .
+
+      - name: Generate Trivy SARIF
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -x ./trivy ]]; then
+            ./trivy config \
+              --severity HIGH,CRITICAL \
+              --exit-code 0 \
+              --ignorefile .trivyignore \
+              --skip-version-check \
+              --format sarif \
+              --output trivy-terraform.sarif \
+              .
+          fi
 
       - name: Upload Trivy SARIF
         if: always() && hashFiles('trivy-terraform.sarif') != ''
