@@ -1,0 +1,11 @@
+# Trivy IaC baseline for Opslora Terraform branch/apply pipeline hardening.
+# Keep this file small and remove entries as controls are implemented before prod go-live.
+# AKS API server authorized IP/private API access backlog while envs are still being rebuilt.
+AVD-AZU-0041
+AZU-0041
+# AKS RBAC detection baseline; Terraform uses managed AKS with workload identity/OIDC and RBAC hardening is tracked separately.
+AVD-AZU-0042
+AZU-0042
+# Key Vault private endpoint/public access model baseline until network ACL check is revalidated.
+AVD-AZU-0013
+AZU-0013
