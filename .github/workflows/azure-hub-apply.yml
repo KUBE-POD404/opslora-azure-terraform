@@ -1,30 +1,89 @@
 name: Azure Hub Terraform Apply
 
 on:
+  pull_request:
+    types: [closed]
+    branches:
+      - hub
+    paths:
+      - "environments/hub/**"
+      - "modules/**"
+      - ".github/workflows/azure-hub-apply.yml"
   workflow_dispatch:
     inputs:
       confirm_apply:
-        description: "Type apply-hub to run terraform apply for opslora-connectivity."
+        description: "Type apply-hub to run terraform apply for opslora-hub."
         required: true
         type: string
 
 permissions:
   id-token: write
   contents: read
+  pull-requests: read
 
 concurrency:
   group: terraform-hub-apply
   cancel-in-progress: false
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_apply: ${{ steps.gate.outputs.should_apply }}
+      reason: ${{ steps.gate.outputs.reason }}
+    steps:
+      - id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONFIRM_APPLY: ${{ inputs.confirm_apply || '' }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          PR_MERGED: ${{ github.event.pull_request.merged || 'false' }}
+          PR_LABELS_JSON: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          should_apply=false
+          reason="not-authorized"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "$GITHUB_REF_NAME" == "hub" && "$CONFIRM_APPLY" == "apply-hub" ]]; then
+              should_apply=true
+              reason="manual-confirmed-hub"
+            else
+              reason="manual-dispatch-requires-hub-branch-and-apply-hub"
+            fi
+          elif [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            if [[ "$GITHUB_REF_NAME" != "hub" ]]; then
+              reason="pull-request-event-not-on-hub"
+            elif [[ "$PR_MERGED" != "true" ]]; then
+              reason="pull-request-not-merged"
+            elif ! echo "$PR_LABELS_JSON" | jq -e 'index("terraform-apply") or index("apply")' >/dev/null; then
+              reason="missing-terraform-apply-or-apply-label"
+            else
+              gh api "repos/${{ github.repository }}/pulls/${PR_NUMBER}/reviews" > reviews.json
+              approved=$(jq -r 'map(select(.state == "APPROVED")) | length > 0' reviews.json)
+              if [[ "$approved" == "true" ]]; then
+                should_apply=true
+                reason="merged-approved-labeled-pr"
+              else
+                reason="missing-approved-review"
+              fi
+            fi
+          fi
+
+          echo "should_apply=$should_apply" >> "$GITHUB_OUTPUT"
+          echo "reason=$reason" >> "$GITHUB_OUTPUT"
+          echo "Terraform apply gate: $should_apply ($reason)"
+
   apply:
-    if: ${{ github.ref == 'refs/heads/hub' && inputs.confirm_apply == 'apply-hub' }}
+    needs: gate
+    if: ${{ needs.gate.outputs.should_apply == 'true' }}
     runs-on: ubuntu-latest
     environment: hub
     env:
-      TF_IN_AUTOMATION: "true"
       TF_VAR_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_IN_AUTOMATION: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,6 +96,7 @@ jobs:
             echo "Hub apply can only run from the hub branch." >&2
             exit 1
           fi
+          echo "Gate reason: ${{ needs.gate.outputs.reason }}"
 
       - name: Azure login
         uses: azure/login@v2
