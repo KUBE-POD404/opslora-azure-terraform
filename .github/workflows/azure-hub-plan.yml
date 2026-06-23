@@ -2,10 +2,13 @@ name: Azure Hub Terraform Plan
 
 on:
   pull_request:
+    branches:
+      - hub
     paths:
       - "environments/hub/**"
       - "modules/**"
       - ".github/workflows/azure-hub-plan.yml"
+      - ".github/workflows/terraform-pr-quality.yml"
   workflow_dispatch:
 
 permissions:
@@ -13,11 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: terraform-hub-plan-${{ github.ref }}
+  group: terraform-hub-plan-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   plan:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/hub' }}
     runs-on: ubuntu-latest
     env:
       TF_IN_AUTOMATION: "true"
@@ -26,6 +30,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enforce hub plan branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.base_ref }}" != "hub" ]]; then
+            echo "Hub plans are only allowed for PRs targeting hub." >&2
+            exit 1
+          fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${GITHUB_REF_NAME}" != "hub" ]]; then
+            echo "Manual hub plans must run from the hub branch." >&2
+            exit 1
+          fi
 
       - name: Azure login
         uses: azure/login@v2

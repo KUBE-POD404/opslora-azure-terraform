@@ -2,30 +2,26 @@ name: Azure Test Terraform Plan
 
 on:
   pull_request:
+    branches:
+      - test
     paths:
       - "environments/test/**"
       - "modules/**"
       - ".github/workflows/azure-test-plan.yml"
+      - ".github/workflows/terraform-pr-quality.yml"
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - Azure Hub Terraform Apply
-    types:
-      - completed
-    branches:
-      - azure/hub-test-foundation
 
 permissions:
   id-token: write
   contents: read
 
 concurrency:
-  group: terraform-test-plan-${{ github.ref }}
+  group: terraform-test-plan-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   plan:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/test' }}
     runs-on: ubuntu-latest
     env:
       TF_IN_AUTOMATION: "true"
@@ -36,6 +32,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enforce test plan branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.base_ref }}" != "test" ]]; then
+            echo "Test plans are only allowed for PRs targeting test." >&2
+            exit 1
+          fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${GITHUB_REF_NAME}" != "test" ]]; then
+            echo "Manual test plans must run from the test branch." >&2
+            exit 1
+          fi
 
       - name: Azure login
         uses: azure/login@v2

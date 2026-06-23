@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_apply:
-        description: 'Type apply-hub to run terraform apply for opslora-connectivity.'
+        description: "Type apply-hub to run terraform apply for opslora-connectivity."
         required: true
         type: string
 
@@ -18,8 +18,9 @@ concurrency:
 
 jobs:
   apply:
-    if: ${{ inputs.confirm_apply == 'apply-hub' && github.ref == 'refs/heads/azure/hub-test-foundation' }}
+    if: ${{ github.ref == 'refs/heads/hub' && inputs.confirm_apply == 'apply-hub' }}
     runs-on: ubuntu-latest
+    environment: hub
     env:
       TF_IN_AUTOMATION: "true"
       TF_VAR_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
@@ -27,6 +28,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enforce hub branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_NAME" != "hub" ]]; then
+            echo "Hub apply can only run from the hub branch." >&2
+            exit 1
+          fi
 
       - name: Azure login
         uses: azure/login@v2

@@ -2,10 +2,13 @@ name: Azure Prod Terraform Plan
 
 on:
   pull_request:
+    branches:
+      - main
     paths:
       - "environments/prod/**"
       - "modules/**"
       - ".github/workflows/azure-prod-plan.yml"
+      - ".github/workflows/terraform-pr-quality.yml"
   workflow_dispatch:
 
 permissions:
@@ -13,12 +16,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: terraform-prod-plan-${{ github.ref }}
+  group: terraform-prod-plan-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   plan:
-    if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/azure/hub-test-foundation' }}
+    if: ${{ github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment: prod
     env:
@@ -37,6 +40,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enforce prod plan branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.base_ref }}" != "main" ]]; then
+            echo "Prod plans are only allowed for PRs targeting main." >&2
+            exit 1
+          fi
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${GITHUB_REF_NAME}" != "main" ]]; then
+            echo "Manual prod plans must run from main." >&2
+            exit 1
+          fi
 
       - name: Check required secrets
         shell: bash

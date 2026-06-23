@@ -4,12 +4,15 @@ on:
   pull_request:
     branches:
       - main
-      - azure/hub-test-foundation
+      - test
+      - hub
     paths:
       - "**/*.tf"
       - "**/*.tfvars"
       - "**/*.tfvars.example"
       - ".github/workflows/terraform-pr-quality.yml"
+      - ".github/workflows/azure-*-plan.yml"
+      - ".github/workflows/azure-*-apply.yml"
   workflow_dispatch:
 
 permissions:
@@ -123,10 +126,7 @@ jobs:
       - name: Enforce Terraform gates
         run: |
           failures=0
-          for job in \
-            "fmt:${{ needs.fmt.result }}" \
-            "validate:${{ needs.validate.result }}" \
-            "static-analysis:${{ needs.static-analysis.result }}"; do
+          for job in             "fmt:${{ needs.fmt.result }}"             "validate:${{ needs.validate.result }}"             "static-analysis:${{ needs.static-analysis.result }}"; do
             name="${job%%:*}"
             result="${job#*:}"
             echo "$name => $result"

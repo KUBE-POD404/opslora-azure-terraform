@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_apply:
-        description: 'Type apply-test to run terraform apply for opslora-test.'
+        description: "Type apply-test to run terraform apply for opslora-test."
         required: true
         type: string
 
@@ -18,8 +18,9 @@ concurrency:
 
 jobs:
   apply:
-    if: ${{ inputs.confirm_apply == 'apply-test' && github.ref == 'refs/heads/azure/hub-test-foundation' }}
+    if: ${{ github.ref == 'refs/heads/test' && inputs.confirm_apply == 'apply-test' }}
     runs-on: ubuntu-latest
+    environment: test
     env:
       TF_IN_AUTOMATION: "true"
       TF_VAR_subscription_id: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
@@ -29,6 +30,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enforce test branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_NAME" != "test" ]]; then
+            echo "Test apply can only run from the test branch." >&2
+            exit 1
+          fi
 
       - name: Azure login
         uses: azure/login@v2
