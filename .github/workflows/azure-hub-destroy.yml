@@ -22,9 +22,8 @@ concurrency:
 
 jobs:
   destroy:
-    if: ${{ github.ref == 'refs/heads/hub' && inputs.confirm_destroy == 'destroy-hub' && inputs.second_confirm == 'delete-hub-terraform-state-resources' }}
+    if: ${{ (github.ref == 'refs/heads/hub' || github.ref == 'refs/heads/azure/hub-test-foundation') && inputs.confirm_destroy == 'destroy-hub' && inputs.second_confirm == 'delete-hub-terraform-state-resources' }}
     runs-on: ubuntu-latest
-    environment: hub
     env:
       TF_VAR_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
       TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
@@ -37,8 +36,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF_NAME" != "hub" ]]; then
-            echo "hub destroy can only run from the hub branch." >&2
+          if [[ "$GITHUB_REF_NAME" != "hub" && "$GITHUB_REF_NAME" != "azure/hub-test-foundation" ]]; then
+            echo "hub destroy can only run from the hub or azure/hub-test-foundation branch." >&2
             exit 1
           fi
           if [[ "${{ inputs.confirm_destroy }}" != "destroy-hub" ]]; then
