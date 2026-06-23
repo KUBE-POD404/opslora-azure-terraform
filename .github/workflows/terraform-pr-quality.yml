@@ -10,6 +10,8 @@ on:
       - "**/*.tf"
       - "**/*.tfvars"
       - "**/*.tfvars.example"
+      - ".checkov.yml"
+      - ".trivyignore"
       - ".github/workflows/terraform-pr-quality.yml"
       - ".github/workflows/azure-*-plan.yml"
       - ".github/workflows/azure-*-apply.yml"
@@ -87,9 +89,8 @@ jobs:
         with:
           directory: .
           framework: terraform
-          # Existing Terraform has baseline findings. Keep reporting them during branch-gate rollout,
-          # but do not block harmless PR/control validation until the baseline is remediated.
-          soft_fail: true
+          config_file: .checkov.yml
+          soft_fail: false
           output_format: cli,sarif
           output_file_path: console,checkov.sarif
           quiet: true
@@ -107,7 +108,7 @@ jobs:
           scan-type: config
           scan-ref: .
           severity: HIGH,CRITICAL
-          exit-code: "0"
+          exit-code: "1"
           format: sarif
           output: trivy-terraform.sarif
 
