@@ -74,7 +74,14 @@ jobs:
         shell: bash
         run: |
           set +e
-          terraform plan -input=false -out=tfplan -no-color 2>&1 | tee tfplan-output.txt
+          plan_refresh_arg=""
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            # The cost-control pause stops MySQL, and Azure returns 409 on database refresh.
+            # PR plans use state-only refresh to keep branch validation working while runtime is paused.
+            # Manual plans still refresh live Azure state.
+            plan_refresh_arg="-refresh=false"
+          fi
+          terraform plan $plan_refresh_arg -input=false -out=tfplan -no-color 2>&1 | tee tfplan-output.txt
           status=${PIPESTATUS[0]}
           {
             echo "## Test Terraform Plan"
