@@ -75,6 +75,19 @@ jobs:
         working-directory: environments/test
         run: terraform validate
 
+      - name: Start stopped MySQL before destroy refresh
+        shell: bash
+        run: |
+          set -euo pipefail
+          server="mysql-opslora-test-cin-001"
+          rg="rg-opslora-test-data-cin"
+          state=$(az mysql flexible-server show -g "$rg" -n "$server" --query state -o tsv 2>/dev/null || true)
+          echo "MySQL state before destroy: ${state:-missing}"
+          if [[ "$state" == "Stopped" ]]; then
+            az mysql flexible-server start -g "$rg" -n "$server"
+            az mysql flexible-server wait -g "$rg" -n "$server" --custom "state=='Ready'" --interval 15 --timeout 900
+          fi
+
       - name: Terraform destroy plan
         working-directory: environments/test
         shell: bash
