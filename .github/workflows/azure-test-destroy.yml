@@ -75,17 +75,25 @@ jobs:
         working-directory: environments/test
         run: terraform validate
 
-      - name: Start stopped MySQL before destroy refresh
+      - name: Start stopped test runtime before destroy refresh
         shell: bash
         run: |
           set -euo pipefail
-          server="mysql-opslora-test-cin-001"
-          rg="rg-opslora-test-data-cin"
-          state=$(az mysql flexible-server show -g "$rg" -n "$server" --query state -o tsv 2>/dev/null || true)
-          echo "MySQL state before destroy: ${state:-missing}"
-          if [[ "$state" == "Stopped" ]]; then
-            az mysql flexible-server start -g "$rg" -n "$server"
-            az mysql flexible-server wait -g "$rg" -n "$server" --custom "state=='Ready'" --interval 15 --timeout 900
+          mysql_server="mysql-opslora-test-cin-001"
+          mysql_rg="rg-opslora-test-data-cin"
+          mysql_state=$(az mysql flexible-server show -g "$mysql_rg" -n "$mysql_server" --query state -o tsv 2>/dev/null || true)
+          echo "MySQL state before destroy: ${mysql_state:-missing}"
+          if [[ "$mysql_state" == "Stopped" ]]; then
+            az mysql flexible-server start -g "$mysql_rg" -n "$mysql_server"
+            az mysql flexible-server wait -g "$mysql_rg" -n "$mysql_server" --custom "state=='Ready'" --interval 15 --timeout 900
+          fi
+
+          aks_name="aks-opslora-test-cin-001"
+          aks_rg="rg-opslora-test-aks-cin"
+          aks_state=$(az aks show -g "$aks_rg" -n "$aks_name" --query powerState.code -o tsv 2>/dev/null || true)
+          echo "AKS power state before destroy: ${aks_state:-missing}"
+          if [[ "$aks_state" == "Stopped" ]]; then
+            az aks start -g "$aks_rg" -n "$aks_name"
           fi
 
       - name: Terraform destroy plan
