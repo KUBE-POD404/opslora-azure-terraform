@@ -1,0 +1,117 @@
+name: Azure Hub Terraform Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: "Type destroy-hub to destroy the hub Terraform root."
+        required: true
+        type: string
+      second_confirm:
+        description: "Type delete-hub-terraform-state-resources to acknowledge this destroys Azure resources managed by Terraform."
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-hub-destroy
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    if: ${{ github.ref == 'refs/heads/hub' && inputs.confirm_destroy == 'destroy-hub' && inputs.second_confirm == 'delete-hub-terraform-state-resources' }}
+    runs-on: ubuntu-latest
+    environment: hub
+    env:
+      TF_VAR_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enforce hub branch and explicit destroy confirmations
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_NAME" != "hub" ]]; then
+            echo "hub destroy can only run from the hub branch." >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.confirm_destroy }}" != "destroy-hub" ]]; then
+            echo "confirm_destroy must be destroy-hub" >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.second_confirm }}" != "delete-hub-terraform-state-resources" ]]; then
+            echo "second_confirm must be delete-hub-terraform-state-resources" >&2
+            exit 1
+          fi
+          echo "Destroy confirmation accepted for hub."
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_HUB_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: environments/hub
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: environments/hub
+        run: terraform validate
+
+      - name: Terraform destroy plan
+        working-directory: environments/hub
+        shell: bash
+        run: |
+          set +e
+          terraform plan -destroy -input=false -out=tfdestroy.plan -no-color 2>&1 | tee tfdestroy-plan-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Hub Terraform Destroy Plan"
+            echo
+            echo '```text'
+            tail -n 240 tfdestroy-plan-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Terraform destroy apply
+        working-directory: environments/hub
+        shell: bash
+        run: |
+          set +e
+          terraform apply -input=false -auto-approve tfdestroy.plan -no-color 2>&1 | tee tfdestroy-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Hub Terraform Destroy Apply"
+            echo
+            echo '```text'
+            tail -n 240 tfdestroy-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload destroy artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hub-tfdestroy-${{ github.run_id }}
+          path: |
+            environments/hub/tfdestroy-plan-output.txt
+            environments/hub/tfdestroy-output.txt
+          retention-days: 14

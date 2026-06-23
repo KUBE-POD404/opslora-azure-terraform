@@ -1,0 +1,124 @@
+name: Azure Prod Terraform Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: "Type destroy-prod to destroy the prod Terraform root."
+        required: true
+        type: string
+      second_confirm:
+        description: "Type delete-prod-terraform-state-resources to acknowledge this destroys Azure resources managed by Terraform."
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: terraform-prod-destroy
+  cancel-in-progress: false
+
+jobs:
+  destroy:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_destroy == 'destroy-prod' && inputs.second_confirm == 'delete-prod-terraform-state-resources' }}
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      AZURE_PROD_CLIENT_ID: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+      AZURE_PROD_SUBSCRIPTION_ID: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+      AZURE_HUB_SUBSCRIPTION_ID: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+      TF_VAR_subscription_id: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+      TF_VAR_hub_subscription_id: ${{ secrets.AZURE_HUB_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_VAR_ssh_public_key: ${{ secrets.AZURE_AKS_SSH_PUBLIC_KEY }}
+      TF_VAR_enable_rbac_assignments: ${{ vars.ENABLE_PROD_RBAC_ASSIGNMENTS || 'false' }}
+      TF_VAR_rbac_group_object_ids: ${{ vars.PROD_RBAC_GROUP_OBJECT_IDS || '{}' }}
+      TF_IN_AUTOMATION: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enforce main branch and explicit destroy confirmations
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_NAME" != "main" ]]; then
+            echo "prod destroy can only run from the main branch." >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.confirm_destroy }}" != "destroy-prod" ]]; then
+            echo "confirm_destroy must be destroy-prod" >&2
+            exit 1
+          fi
+          if [[ "${{ inputs.second_confirm }}" != "delete-prod-terraform-state-resources" ]]; then
+            echo "second_confirm must be delete-prod-terraform-state-resources" >&2
+            exit 1
+          fi
+          echo "Destroy confirmation accepted for prod."
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_PROD_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_PROD_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive
+
+      - name: Terraform init
+        working-directory: environments/prod
+        run: terraform init
+
+      - name: Terraform validate
+        working-directory: environments/prod
+        run: terraform validate
+
+      - name: Terraform destroy plan
+        working-directory: environments/prod
+        shell: bash
+        run: |
+          set +e
+          terraform plan -destroy -input=false -out=tfdestroy.plan -no-color 2>&1 | tee tfdestroy-plan-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Prod Terraform Destroy Plan"
+            echo
+            echo '```text'
+            tail -n 240 tfdestroy-plan-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Terraform destroy apply
+        working-directory: environments/prod
+        shell: bash
+        run: |
+          set +e
+          terraform apply -input=false -auto-approve tfdestroy.plan -no-color 2>&1 | tee tfdestroy-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo "## Prod Terraform Destroy Apply"
+            echo
+            echo '```text'
+            tail -n 240 tfdestroy-output.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Upload destroy artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prod-tfdestroy-${{ github.run_id }}
+          path: |
+            environments/prod/tfdestroy-plan-output.txt
+            environments/prod/tfdestroy-output.txt
+          retention-days: 14
