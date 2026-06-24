@@ -70,7 +70,7 @@ module "governance" {
   enable_policy_assignments       = var.enable_governance_policy_assignments
   policy_effect                   = "Deny"
   key_vault_public_network_effect = "Deny"
-  aks_workload_identity_effect    = "Deny"
+  aks_workload_identity_effect    = "Audit"
   tags                            = var.tags
 }
 
