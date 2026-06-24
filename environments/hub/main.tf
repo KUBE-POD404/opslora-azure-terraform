@@ -85,6 +85,14 @@ module "hub_dns_resolver" {
   tags                = var.tags
 }
 
+
+check "onprem_shared_keys_match_sites" {
+  assert {
+    condition     = length(setsubtract(keys(var.onprem_sites), keys(var.onprem_shared_keys))) == 0
+    error_message = "Every onprem_sites key must have a matching onprem_shared_keys entry supplied via secure tfvars or GitHub Actions secrets."
+  }
+}
+
 module "hub_connectivity" {
   source                      = "../../modules/hub-connectivity"
   location                    = var.location
