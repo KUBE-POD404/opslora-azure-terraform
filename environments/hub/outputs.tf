@@ -55,3 +55,11 @@ output "frontdoor_endpoint_host_names" {
     for key, endpoint in azurerm_cdn_frontdoor_endpoint.opslora : key => endpoint.host_name
   }
 }
+
+output "public_dns_zone_name" {
+  value = azurerm_dns_zone.opslora.name
+}
+
+output "public_dns_zone_name_servers" {
+  value = azurerm_dns_zone.opslora.name_servers
+}
