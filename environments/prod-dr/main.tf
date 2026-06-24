@@ -189,12 +189,12 @@ module "aks" {
   service_cidr               = "10.243.0.0/16"
   dns_service_ip             = "10.243.0.10"
   system_node_pool = {
-    vm_size   = "Standard_D2s_v5"
+    vm_size   = "Standard_D2s_v3"
     min_count = 1
     max_count = 3
   }
   apps_node_pool = {
-    vm_size   = "Standard_D4s_v5"
+    vm_size   = "Standard_D4s_v3"
     min_count = 1
     max_count = 5
   }
