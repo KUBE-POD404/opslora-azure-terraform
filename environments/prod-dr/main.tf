@@ -68,7 +68,7 @@ module "governance" {
   location                        = var.location
   scope_name                      = local.env
   enable_policy_assignments       = var.enable_governance_policy_assignments
-  policy_effect                   = "Deny"
+  policy_effect                   = "Audit"
   key_vault_public_network_effect = "Deny"
   aks_workload_identity_effect    = "Audit"
   tags                            = var.tags
@@ -170,6 +170,10 @@ module "mysql" {
   backup_retention_days        = 35
   geo_redundant_backup_enabled = true
   tags                         = var.tags
+
+  depends_on = [
+    azurerm_private_dns_zone_virtual_network_link.prod_dr,
+  ]
 }
 
 module "aks" {

@@ -76,7 +76,7 @@ module "governance" {
   admin_principal_object_ids          = var.admin_principal_object_ids
   enable_admin_owner_role_assignments = var.enable_admin_owner_role_assignments
   enable_policy_assignments           = var.enable_governance_policy_assignments
-  policy_effect                       = "Deny"
+  policy_effect                       = "Audit"
   key_vault_public_network_effect     = "Deny"
   aks_workload_identity_effect        = "Audit"
   tags                                = var.tags
@@ -192,6 +192,10 @@ module "mysql" {
     standby_availability_zone = "2"
   }
   tags = var.tags
+
+  depends_on = [
+    azurerm_private_dns_zone_virtual_network_link.prod,
+  ]
 }
 
 module "aks" {
