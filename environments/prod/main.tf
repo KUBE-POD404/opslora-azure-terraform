@@ -238,6 +238,13 @@ resource "azurerm_role_assignment" "aks_key_vault_secrets_provider" {
   principal_id         = module.aks.key_vault_secrets_provider_object_id
 }
 
+
+resource "azurerm_role_assignment" "github_actions_key_vault_secrets_officer" {
+  scope                = module.key_vault.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = var.prod_github_actions_oidc_object_id
+}
+
 resource "azurerm_role_assignment" "aks_acr_pull" {
   scope                = module.container_registry.id
   role_definition_name = "AcrPull"

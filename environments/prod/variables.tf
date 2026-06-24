@@ -102,3 +102,9 @@ variable "enable_rbac_assignments" {
   description = "Create resource-group scoped RBAC assignments from rbac_group_object_ids."
   default     = false
 }
+
+variable "prod_github_actions_oidc_object_id" {
+  type        = string
+  description = "Microsoft Entra service principal object ID used by GitHub Actions OIDC for prod workflows that seed Key Vault secrets."
+  default     = "5e057103-ed39-4bbd-bd57-c1fe8aae0925"
+}
