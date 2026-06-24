@@ -1,0 +1,23 @@
+# Example only. Do not commit real endpoint secrets.
+# Copy to a secure untracked tfvars file or provide through GitHub Actions secrets.
+
+onprem_sites = {
+  ai-trivandrum = {
+    # Replace with OPNsense WAN public IP or stable DDNS after firewall setup.
+    gateway_address = "203.0.113.10"
+
+    # Advertise only the controlled AI VLAN to Azure.
+    address_spaces = ["172.16.10.0/24"]
+  }
+}
+
+onprem_private_dns_zone_name = "onprem.opslora.internal"
+
+onprem_a_records = {
+  ai-gateway = "172.16.10.10"
+}
+
+# Secret. Do not commit real PSKs.
+# onprem_shared_keys = {
+#   ai-trivandrum = "<secure-ipsec-psk-not-in-git>"
+# }
