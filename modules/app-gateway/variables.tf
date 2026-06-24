@@ -18,6 +18,13 @@ variable "public_ip_name" {
   type = string
 }
 
+variable "public_ip_zones" {
+  type        = list(string)
+  description = "Availability zones for the Application Gateway public IP. Set to null in regions/subscriptions that do not support zonal public IPs."
+  default     = ["1", "2", "3"]
+  nullable    = true
+}
+
 variable "waf_mode" {
   type    = string
   default = "Prevention"
