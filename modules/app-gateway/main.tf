@@ -53,6 +53,11 @@ resource "azurerm_application_gateway" "this" {
     port = 80
   }
 
+  frontend_port {
+    name = "https"
+    port = 443
+  }
+
   frontend_ip_configuration {
     name                 = "public"
     public_ip_address_id = azurerm_public_ip.this.id
