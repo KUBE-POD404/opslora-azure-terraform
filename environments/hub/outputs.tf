@@ -45,3 +45,13 @@ output "vpn_gateway_public_ip_address" {
 output "dns_resolver_inbound_ip" {
   value = module.hub_dns_resolver.inbound_endpoint_ip
 }
+
+output "frontdoor_profile_name" {
+  value = azurerm_cdn_frontdoor_profile.opslora.name
+}
+
+output "frontdoor_endpoint_host_names" {
+  value = {
+    for key, endpoint in azurerm_cdn_frontdoor_endpoint.opslora : key => endpoint.host_name
+  }
+}
