@@ -160,13 +160,16 @@ module "key_vault" {
 }
 
 module "mysql" {
-  source                       = "../../modules/mysql-flexible"
-  name                         = "mysql-${local.prefix}-${local.env}-${var.location_code}-001"
-  location                     = var.location
-  resource_group_name          = module.resource_groups.names[local.resource_group_names.data]
-  delegated_subnet_id          = module.spoke_network.subnet_ids["snet-mysql-flexible"]
-  private_dns_zone_id          = data.terraform_remote_state.hub.outputs.private_dns_zone_ids["private.mysql.database.azure.com"]
-  sku_name                     = "GP_Standard_D2ds_v4"
+  source              = "../../modules/mysql-flexible"
+  name                = "mysql-${local.prefix}-${local.env}-${var.location_code}-001"
+  location            = var.location
+  resource_group_name = module.resource_groups.names[local.resource_group_names.data]
+  delegated_subnet_id = module.spoke_network.subnet_ids["snet-mysql-flexible"]
+  private_dns_zone_id = data.terraform_remote_state.hub.outputs.private_dns_zone_ids["private.mysql.database.azure.com"]
+  sku_name            = "GP_Standard_D2ds_v4"
+  # South India reports MySQL Flexible Server zone support as "none" for this subscription.
+  # Leave zone unset so Azure chooses a valid placement.
+  zone                         = null
   backup_retention_days        = 35
   geo_redundant_backup_enabled = true
   tags                         = var.tags
