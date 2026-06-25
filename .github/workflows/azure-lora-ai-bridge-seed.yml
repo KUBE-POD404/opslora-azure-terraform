@@ -1,0 +1,131 @@
+name: Azure Lora AI Bridge Seed
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - test
+          - prod
+      confirmation:
+        description: "Type SEED_LORA_AI_BRIDGE to seed Lora AI bridge secrets."
+        required: true
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: azure-lora-ai-bridge-seed-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  seed-test:
+    if: ${{ inputs.environment == 'test' && inputs.confirmation == 'SEED_LORA_AI_BRIDGE' }}
+    runs-on: [self-hosted, linux, x64, opslora-test, private-network]
+    environment: test
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_TEST_CLIENT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_TEST_SUBSCRIPTION_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      KEY_VAULT_NAME: kv-opslora-test-cin-001
+      PREFIX: opslora-test-lora-ai
+      HERMES_BASE_URL: ${{ vars.TEST_HERMES_BASE_URL }}
+      HERMES_MODEL: ${{ vars.TEST_HERMES_MODEL }}
+      HERMES_TIMEOUT_SECONDS: ${{ vars.TEST_HERMES_TIMEOUT_SECONDS }}
+      HERMES_API_KEY: ${{ secrets.TEST_HERMES_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+      - name: Seed Lora AI bridge secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in HERMES_BASE_URL HERMES_MODEL HERMES_TIMEOUT_SECONDS HERMES_API_KEY; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "$name is missing" >&2
+              exit 1
+            fi
+          done
+          echo "::add-mask::$HERMES_API_KEY"
+          set_secret() {
+            local name="$1" value="$2" file
+            file="$(mktemp)"
+            printf '%s' "$value" > "$file"
+            az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "$name" --file "$file" --only-show-errors --output none
+            rm -f "$file"
+          }
+          set_secret "${PREFIX}-primary-ai-provider" "ollama"
+          set_secret "${PREFIX}-hermes-base-url" "$HERMES_BASE_URL"
+          set_secret "${PREFIX}-hermes-api-key" "$HERMES_API_KEY"
+          set_secret "${PREFIX}-hermes-model" "$HERMES_MODEL"
+          set_secret "${PREFIX}-hermes-timeout-seconds" "$HERMES_TIMEOUT_SECONDS"
+          {
+            echo "## Lora AI bridge seed"
+            echo "- Environment: test"
+            echo "- Key Vault: \`$KEY_VAULT_NAME\`"
+            echo "- Base URL: \`$HERMES_BASE_URL\`"
+            echo "- Model: \`$HERMES_MODEL\`"
+            echo "- Timeout: \`$HERMES_TIMEOUT_SECONDS\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  seed-prod:
+    if: ${{ inputs.environment == 'prod' && inputs.confirmation == 'SEED_LORA_AI_BRIDGE' }}
+    runs-on: [self-hosted, linux, x64, opslora-prod, private-network]
+    environment: prod
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_PROD_CLIENT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_PROD_SUBSCRIPTION_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      KEY_VAULT_NAME: kv-opslora-prod-cin-001
+      PREFIX: opslora-prod-lora-ai
+      HERMES_BASE_URL: ${{ vars.PROD_HERMES_BASE_URL }}
+      HERMES_MODEL: ${{ vars.PROD_HERMES_MODEL }}
+      HERMES_TIMEOUT_SECONDS: ${{ vars.PROD_HERMES_TIMEOUT_SECONDS }}
+      HERMES_API_KEY: ${{ secrets.PROD_HERMES_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
+      - name: Seed Lora AI bridge secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in HERMES_BASE_URL HERMES_MODEL HERMES_TIMEOUT_SECONDS HERMES_API_KEY; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "$name is missing" >&2
+              exit 1
+            fi
+          done
+          echo "::add-mask::$HERMES_API_KEY"
+          set_secret() {
+            local name="$1" value="$2" file
+            file="$(mktemp)"
+            printf '%s' "$value" > "$file"
+            az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "$name" --file "$file" --only-show-errors --output none
+            rm -f "$file"
+          }
+          set_secret "${PREFIX}-primary-ai-provider" "ollama"
+          set_secret "${PREFIX}-hermes-base-url" "$HERMES_BASE_URL"
+          set_secret "${PREFIX}-hermes-api-key" "$HERMES_API_KEY"
+          set_secret "${PREFIX}-hermes-model" "$HERMES_MODEL"
+          set_secret "${PREFIX}-hermes-timeout-seconds" "$HERMES_TIMEOUT_SECONDS"
+          {
+            echo "## Lora AI bridge seed"
+            echo "- Environment: prod"
+            echo "- Key Vault: \`$KEY_VAULT_NAME\`"
+            echo "- Base URL: \`$HERMES_BASE_URL\`"
+            echo "- Model: \`$HERMES_MODEL\`"
+            echo "- Timeout: \`$HERMES_TIMEOUT_SECONDS\`"
+          } >> "$GITHUB_STEP_SUMMARY"
