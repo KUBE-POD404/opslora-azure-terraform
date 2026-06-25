@@ -64,6 +64,9 @@ jobs:
             rm -f "$file"
           }
           set_secret "${PREFIX}-primary-ai-provider" "ollama"
+          if [[ "$PREFIX" == "opslora-test-lora-ai" ]]; then
+            set_secret "${PREFIX}-database-url" "sqlite:////tmp/lora_ai.db"
+          fi
           set_secret "${PREFIX}-hermes-base-url" "$HERMES_BASE_URL"
           set_secret "${PREFIX}-hermes-api-key" "$HERMES_API_KEY"
           set_secret "${PREFIX}-hermes-model" "$HERMES_MODEL"
