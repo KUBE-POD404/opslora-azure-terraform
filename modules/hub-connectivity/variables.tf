@@ -23,6 +23,12 @@ variable "tags" {
   default = {}
 }
 
+variable "enable_vpn_gateway" {
+  description = "Create the Azure VPN Gateway, Local Network Gateways, and IPsec connections. Disable for the temporary Tailscale AKS bridge architecture."
+  type        = bool
+  default     = false
+}
+
 variable "onprem_sites" {
   description = "Site-to-site VPN peers represented by Azure Local Network Gateways. Keys should be stable site slugs such as ai-trivandrum."
   type = map(object({

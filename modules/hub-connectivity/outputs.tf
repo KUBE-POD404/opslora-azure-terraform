@@ -1,9 +1,9 @@
 output "vpn_gateway_id" {
-  value = azurerm_virtual_network_gateway.this.id
+  value = try(azurerm_virtual_network_gateway.this[0].id, null)
 }
 
 output "vpn_gateway_public_ip_address" {
-  value = azurerm_public_ip.vpn_gateway.ip_address
+  value = try(azurerm_public_ip.vpn_gateway[0].ip_address, null)
 }
 
 output "local_network_gateway_ids" {

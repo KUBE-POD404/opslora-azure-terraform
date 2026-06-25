@@ -5,24 +5,18 @@ admin_principal_object_ids = [
   "00000000-0000-0000-0000-000000000000"
 ]
 
-# Optional site-to-site VPN peers. Keep real values in an untracked secure tfvars
-# file or GitHub Actions variables/secrets. Do not commit real shared keys.
-onprem_sites = {
-  ai-trivandrum = {
-    gateway_address = "203.0.113.10"
-    address_spaces  = ["172.16.10.0/24"]
-  }
-}
+# Opslora currently uses the temporary Tailscale AKS bridge for Azure-to-local
+# AI connectivity. Keep Azure native S2S VPN disabled unless/until the permanent
+# OPNsense/VLAN/IPsec architecture is explicitly restored.
+enable_vpn_gateway = false
 
-onprem_shared_keys = {
-  ai-trivandrum = "REPLACE_WITH_SECURE_SHARED_KEY_OUTSIDE_GIT"
-}
+# Optional future site-to-site VPN peers. Keep real values in an untracked secure
+# tfvars file or GitHub Actions variables/secrets. Do not commit real shared keys.
+# These are ignored while enable_vpn_gateway=false.
+onprem_sites = {}
+onprem_shared_keys = {}
 
-# Optional stable private DNS contract for AKS/app workloads. These records are
-# created in Azure Private DNS and resolve from the hub/spoke VNets; traffic still
-# routes over the VPN to the on-prem subnet. Keep the IPs private/static.
+# Optional stable private DNS contract. Do not point this at the old 172.16.10.x
+# VLAN plan while the active architecture is the temporary Tailscale bridge.
 onprem_private_dns_zone_name = "onprem.opslora.internal"
-
-onprem_a_records = {
-  ai-gateway = "172.16.10.10"
-}
+onprem_a_records            = {}

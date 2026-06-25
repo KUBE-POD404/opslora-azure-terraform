@@ -54,6 +54,12 @@ variable "onprem_sites" {
   default = {}
 }
 
+variable "enable_vpn_gateway" {
+  description = "Create Azure native S2S VPN Gateway resources. Default is false because Opslora currently uses the temporary Tailscale AKS bridge for Azure-to-local AI connectivity."
+  type        = bool
+  default     = false
+}
+
 variable "onprem_shared_keys" {
   description = "IPsec shared keys by onprem_sites key. Provide real values via secure untracked tfvars or GitHub Actions secrets."
   type        = map(string)

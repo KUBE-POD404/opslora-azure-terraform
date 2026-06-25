@@ -6,12 +6,20 @@ Current deployment scope:
 
 - Hub/connectivity subscription.
 - Test spoke subscription.
+- Production spoke subscription.
+- Production DR structure.
+- Temporary Azure-to-local AI connectivity through AKS Tailscale connector StatefulSets, documented in `../opslora-platform-devops/docs/azure-plans/20260625-architecture-shift-tailscale-ai-bridge.md`.
 
-Out of scope for the first implementation:
+Current architecture note:
 
-- Production apply.
-- Production DR apply.
-- Azure Firewall, VPN Gateway, Bastion, and DNS Private Resolver enablement by default.
+- Azure native S2S VPN Gateway is disabled by default (`enable_vpn_gateway = false`) because Opslora currently uses the temporary Tailscale AKS bridge for Azure-to-local AI connectivity.
+- Do not re-enable Azure VPN Gateway / Local Network Gateway / 172.16.10.0/24 OPNsense path unless that permanent architecture is explicitly restored.
+
+Out of scope for the temporary AI bridge phase:
+
+- Azure native S2S VPN Gateway / Local Network Gateway / IPsec connection.
+- OPNsense / `172.16.10.0/24` VLAN routing.
+- Treating VirtualBox as the AI model runtime.
 
 ## Environment Roots
 

@@ -1,4 +1,6 @@
 resource "azurerm_public_ip" "vpn_gateway" {
+  count = var.enable_vpn_gateway ? 1 : 0
+
   name                = "pip-opslora-vpngw-${var.location_code}-001"
   location            = var.location
   resource_group_name = var.resource_group_name
@@ -9,6 +11,8 @@ resource "azurerm_public_ip" "vpn_gateway" {
 }
 
 resource "azurerm_virtual_network_gateway" "this" {
+  count = var.enable_vpn_gateway ? 1 : 0
+
   name                = "vpngw-opslora-hub-${var.location_code}-001"
   location            = var.location
   resource_group_name = var.gateway_resource_group_name
@@ -22,14 +26,14 @@ resource "azurerm_virtual_network_gateway" "this" {
 
   ip_configuration {
     name                          = "vnetGatewayConfig"
-    public_ip_address_id          = azurerm_public_ip.vpn_gateway.id
+    public_ip_address_id          = azurerm_public_ip.vpn_gateway[0].id
     private_ip_address_allocation = "Dynamic"
     subnet_id                     = var.gateway_subnet_id
   }
 }
 
 resource "azurerm_local_network_gateway" "onprem" {
-  for_each = var.onprem_sites
+  for_each = var.enable_vpn_gateway ? var.onprem_sites : {}
 
   name                = "lgw-opslora-${each.key}-${var.location_code}-001"
   location            = var.location
@@ -40,13 +44,13 @@ resource "azurerm_local_network_gateway" "onprem" {
 }
 
 resource "azurerm_virtual_network_gateway_connection" "onprem" {
-  for_each = var.onprem_sites
+  for_each = var.enable_vpn_gateway ? var.onprem_sites : {}
 
   name                       = "cn-opslora-hub-${each.key}-${var.location_code}-001"
   location                   = var.location
   resource_group_name        = var.gateway_resource_group_name
   type                       = "IPsec"
-  virtual_network_gateway_id = azurerm_virtual_network_gateway.this.id
+  virtual_network_gateway_id = azurerm_virtual_network_gateway.this[0].id
   local_network_gateway_id   = azurerm_local_network_gateway.onprem[each.key].id
   shared_key                 = var.onprem_shared_keys[each.key]
 

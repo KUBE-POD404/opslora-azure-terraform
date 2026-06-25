@@ -1,17 +1,43 @@
 # Opslora hub on-prem AI VPN inputs
 
-This hub environment already supports Azure Local Network Gateway + IPsec connection creation through:
+Status: superseded/inactive as of 2026-06-25.
+
+Opslora currently uses the temporary Tailscale AKS bridge for Azure-to-local AI connectivity instead of Azure native S2S VPN.
+
+Active bridge reference:
 
 ```text
-onprem_sites
-onprem_shared_keys
-onprem_private_dns_zone_name
-onprem_a_records
+opslora-platform-devops/docs/azure-plans/20260625-architecture-shift-tailscale-ai-bridge.md
+opslora-platform-devops/docs/azure-plans/20260625-azure-aks-tailscale-temporary-ai-bridge.md
 ```
 
-Use this for the OPNsense on-prem AI VLAN path.
+## Current Terraform posture
 
-## Chosen on-prem contract
+The hub VPN stack is disabled by default:
+
+```text
+enable_vpn_gateway = false
+```
+
+When disabled, Terraform does not create:
+
+```text
+Azure VPN Gateway
+VPN Gateway public IP
+Azure Local Network Gateway
+Azure VPN Connection
+```
+
+This intentionally removes the previous unused VPN resources:
+
+```text
+vpngw-opslora-hub-cin-001
+pip-opslora-vpngw-cin-001
+```
+
+## Historical/permanent design only
+
+The previous permanent design was:
 
 ```text
 Firewall/router: OPNsense dedicated appliance
@@ -22,33 +48,14 @@ Hermes AI host: 172.16.10.10
 Private DNS: ai-gateway.onprem.opslora.internal
 ```
 
-Azure should learn only:
+That design is not active. Do not re-enable it unless the user explicitly chooses to restore the OPNsense/VLAN/IPsec path.
+
+## If the VPN path is restored later
+
+Only set `enable_vpn_gateway = true` and non-empty `onprem_sites` after all are true:
 
 ```text
-172.16.10.0/24
-```
-
-Do not advertise the home/broadband network:
-
-```text
-192.168.29.0/24
-```
-
-## Azure peer
-
-Current hub VPN gateway public IP:
-
-```text
-4.188.98.24
-```
-
-OPNsense should use this as the Azure peer for site-to-site IPsec/IKEv2.
-
-## Before applying
-
-Do not apply non-empty `onprem_sites` until all are true:
-
-```text
+OPNsense/firewall hardware exists
 OPNsense WAN public IP or stable DDNS is known
 OPNsense VLAN 110 exists as 172.16.10.1/24
 Hermes Ethernet/VLAN is active as 172.16.10.10/24
@@ -56,50 +63,14 @@ OPNsense can reach 172.16.10.10
 A secure IPsec PSK has been generated and stored outside git
 ```
 
-## Example
-
-Use the non-secret example file:
+Optional future site definitions remain supported by these variables:
 
 ```text
-environments/hub/examples/onprem-ai-vpn.auto.tfvars.example
+enable_vpn_gateway
+onprem_sites
+onprem_shared_keys
+onprem_private_dns_zone_name
+onprem_a_records
 ```
-
-Copy it to a secure, untracked tfvars location and replace placeholders.
 
 Real PSKs must not be committed. Supply `onprem_shared_keys` via secure tfvars or GitHub Actions secrets/environment variables.
-
-## Expected Terraform resources
-
-For site key `ai-trivandrum`, Terraform creates:
-
-```text
-Local Network Gateway:
-lgw-opslora-ai-trivandrum-cin-001
-
-VPN connection:
-cn-opslora-hub-ai-trivandrum-cin-001
-
-Private DNS zone if records are set:
-onprem.opslora.internal
-
-A record:
-ai-gateway.onprem.opslora.internal -> 172.16.10.10
-```
-
-## Validation after apply
-
-```bash
-az network vpn-connection show \
-  --subscription 2879c873-3751-40c2-b43a-ba4c1198ba89 \
-  --resource-group rg-opslora-hub-connectivity-cin \
-  --name cn-opslora-hub-ai-trivandrum-cin-001 \
-  --query '{status:connectionStatus,egress:egressBytesTransferred,ingress:ingressBytesTransferred}'
-```
-
-Then run the AKS path check from `opslora-platform-devops`:
-
-```bash
-NAMESPACE=opslora-app-ns \
-TARGET_URL=http://ai-gateway.onprem.opslora.internal:8080/health \
-/home/sks/opslora/opslora-platform-devops/scripts/aks_onprem_ai_healthcheck.sh
-```
