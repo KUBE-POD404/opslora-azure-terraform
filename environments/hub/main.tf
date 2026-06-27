@@ -67,6 +67,7 @@ module "hub_security" {
 
 module "hub_management" {
   source              = "../../modules/hub-management"
+  enable_bastion      = var.enable_bastion
   location            = var.location
   location_code       = var.location_code
   resource_group_name = module.resource_groups.names["rg-${local.prefix}-${local.scope}-management-${var.location_code}"]
@@ -95,6 +96,7 @@ check "onprem_shared_keys_match_sites" {
 
 module "hub_connectivity" {
   source                      = "../../modules/hub-connectivity"
+  enable_vpn_gateway          = var.enable_vpn_gateway
   location                    = var.location
   location_code               = var.location_code
   resource_group_name         = module.resource_groups.names["rg-${local.prefix}-${local.scope}-connectivity-${var.location_code}"]

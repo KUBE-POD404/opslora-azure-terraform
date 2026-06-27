@@ -18,3 +18,10 @@ variable "tags" {
   type    = map(string)
   default = {}
 }
+
+
+variable "enable_bastion" {
+  description = "Create Azure Bastion and its public IP. Keep false unless temporary browser/SSH/RDP access is explicitly needed."
+  type        = bool
+  default     = false
+}

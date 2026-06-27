@@ -45,6 +45,19 @@ variable "enable_governance_policy_assignments" {
   default     = true
 }
 
+
+variable "enable_bastion" {
+  description = "Create Azure Bastion resources. Default is false because Bastion is temporary and should stay down unless explicitly needed."
+  type        = bool
+  default     = false
+}
+
+variable "enable_vpn_gateway" {
+  description = "Create Azure native S2S VPN Gateway resources. Default is false because Opslora uses Tailscale for Azure-to-local AI connectivity."
+  type        = bool
+  default     = false
+}
+
 variable "onprem_sites" {
   description = "Site-to-site VPN peers for on-prem/hybrid workloads. Provide real endpoint values via secure untracked tfvars or GitHub Actions variables."
   type = map(object({
