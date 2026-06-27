@@ -1,7 +1,7 @@
 output "bastion_id" {
-  value = azurerm_bastion_host.this.id
+  value = try(azurerm_bastion_host.this[0].id, null)
 }
 
 output "bastion_public_ip_address" {
-  value = azurerm_public_ip.bastion.ip_address
+  value = try(azurerm_public_ip.bastion[0].ip_address, null)
 }

@@ -38,3 +38,10 @@ variable "onprem_shared_keys" {
   sensitive   = true
   default     = {}
 }
+
+
+variable "enable_vpn_gateway" {
+  description = "Create Azure VPN Gateway, Local Network Gateways, and IPsec connections. Keep false while Tailscale is the active Azure-to-local path."
+  type        = bool
+  default     = false
+}
