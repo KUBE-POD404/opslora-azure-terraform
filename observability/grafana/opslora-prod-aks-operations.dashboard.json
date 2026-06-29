@@ -1,34 +1,9 @@
 {
-  "title": "Opslora Prod AKS Operations",
-  "uid": "opslora-prod-aks-operations",
-  "tags": [
-    "opslora",
-    "prod",
-    "aks",
-    "terraform"
-  ],
-  "timezone": "browser",
-  "schemaVersion": 39,
-  "version": 1,
-  "refresh": "1m",
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
   "panels": [
     {
-      "id": 1,
-      "type": "timeseries",
-      "title": "AKS Node CPU %",
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
         "uid": "azure-monitor-oob"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 0
       },
       "fieldConfig": {
         "defaults": {
@@ -36,6 +11,13 @@
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -48,50 +30,37 @@
       },
       "targets": [
         {
-          "refId": "A",
+          "azureLogAnalytics": {
+            "dashboardTime": true,
+            "query": "AzureMetrics\n| where $__timeFilter(TimeGenerated)\n| where ResourceProvider == \"MICROSOFT.CONTAINERSERVICE\"\n| where MetricName == \"node_cpu_usage_percentage\"\n| summarize AvgCPU=avg(Average) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "resources": [
+              "/subscriptions/022f0684-6e55-4dbf-af86-8ea607fe4833/resourceGroups/rg-opslora-prod-monitoring-cin/providers/Microsoft.OperationalInsights/workspaces/law-opslora-prod-cin-001"
+            ],
+            "resultFormat": "time_series",
+            "timeColumn": "TimeGenerated"
+          },
           "datasource": {
             "type": "grafana-azure-monitor-datasource",
             "uid": "azure-monitor-oob"
           },
-          "queryType": "Azure Monitor",
-          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
-          "azureMonitor": {
-            "aggregation": "Average",
-            "allowedTimeGrainsMs": [
-              60000,
-              300000,
-              900000,
-              1800000,
-              3600000,
-              21600000,
-              43200000,
-              86400000
-            ],
-            "dimensionFilters": [],
-            "metricName": "node_cpu_usage_percentage",
-            "metricNamespace": "Microsoft.ContainerService/managedClusters",
-            "region": "centralindia",
-            "resources": [
-              {
-                "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
-                "resourceGroup": "rg-opslora-prod-aks-cin",
-                "resourceName": "aks-opslora-prod-cin-001",
-                "metricNamespace": "Microsoft.ContainerService/managedClusters",
-                "region": "centralindia"
-              }
-            ],
-            "timeGrain": "auto"
-          }
+          "queryType": "Azure Log Analytics",
+          "refId": "A",
+          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833"
         }
-      ]
+      ],
+      "title": "AKS Node CPU %",
+      "type": "timeseries"
     },
     {
-      "id": 2,
-      "type": "timeseries",
-      "title": "AKS Node Memory Working Set %",
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
         "uid": "azure-monitor-oob"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
       },
       "gridPos": {
         "h": 8,
@@ -99,12 +68,7 @@
         "x": 12,
         "y": 0
       },
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percent"
-        },
-        "overrides": []
-      },
+      "id": 2,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -117,56 +81,31 @@
       },
       "targets": [
         {
-          "refId": "A",
+          "azureLogAnalytics": {
+            "dashboardTime": true,
+            "query": "AzureMetrics\n| where $__timeFilter(TimeGenerated)\n| where ResourceProvider == \"MICROSOFT.CONTAINERSERVICE\"\n| where MetricName == \"node_memory_working_set_percentage\"\n| summarize AvgMemory=avg(Average) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "resources": [
+              "/subscriptions/022f0684-6e55-4dbf-af86-8ea607fe4833/resourceGroups/rg-opslora-prod-monitoring-cin/providers/Microsoft.OperationalInsights/workspaces/law-opslora-prod-cin-001"
+            ],
+            "resultFormat": "time_series",
+            "timeColumn": "TimeGenerated"
+          },
           "datasource": {
             "type": "grafana-azure-monitor-datasource",
             "uid": "azure-monitor-oob"
           },
-          "queryType": "Azure Monitor",
-          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
-          "azureMonitor": {
-            "aggregation": "Average",
-            "allowedTimeGrainsMs": [
-              60000,
-              300000,
-              900000,
-              1800000,
-              3600000,
-              21600000,
-              43200000,
-              86400000
-            ],
-            "dimensionFilters": [],
-            "metricName": "node_memory_working_set_percentage",
-            "metricNamespace": "Microsoft.ContainerService/managedClusters",
-            "region": "centralindia",
-            "resources": [
-              {
-                "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
-                "resourceGroup": "rg-opslora-prod-aks-cin",
-                "resourceName": "aks-opslora-prod-cin-001",
-                "metricNamespace": "Microsoft.ContainerService/managedClusters",
-                "region": "centralindia"
-              }
-            ],
-            "timeGrain": "auto"
-          }
+          "queryType": "Azure Log Analytics",
+          "refId": "A",
+          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833"
         }
-      ]
+      ],
+      "title": "AKS Node Memory Working Set %",
+      "type": "timeseries"
     },
     {
-      "id": 3,
-      "type": "timeseries",
-      "title": "Unschedulable Pods",
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
         "uid": "azure-monitor-oob"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -174,6 +113,13 @@
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -186,56 +132,31 @@
       },
       "targets": [
         {
-          "refId": "A",
+          "azureLogAnalytics": {
+            "dashboardTime": true,
+            "query": "KubePodInventory\n| where $__timeFilter(TimeGenerated)\n| summarize Running=countif(ContainerStatus == \"running\"), NotRunning=countif(ContainerStatus != \"running\") by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "resources": [
+              "/subscriptions/022f0684-6e55-4dbf-af86-8ea607fe4833/resourceGroups/rg-opslora-prod-monitoring-cin/providers/Microsoft.OperationalInsights/workspaces/law-opslora-prod-cin-001"
+            ],
+            "resultFormat": "time_series",
+            "timeColumn": "TimeGenerated"
+          },
           "datasource": {
             "type": "grafana-azure-monitor-datasource",
             "uid": "azure-monitor-oob"
           },
-          "queryType": "Azure Monitor",
-          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
-          "azureMonitor": {
-            "aggregation": "Average",
-            "allowedTimeGrainsMs": [
-              60000,
-              300000,
-              900000,
-              1800000,
-              3600000,
-              21600000,
-              43200000,
-              86400000
-            ],
-            "dimensionFilters": [],
-            "metricName": "cluster_autoscaler_unschedulable_pods_count",
-            "metricNamespace": "Microsoft.ContainerService/managedClusters",
-            "region": "centralindia",
-            "resources": [
-              {
-                "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
-                "resourceGroup": "rg-opslora-prod-aks-cin",
-                "resourceName": "aks-opslora-prod-cin-001",
-                "metricNamespace": "Microsoft.ContainerService/managedClusters",
-                "region": "centralindia"
-              }
-            ],
-            "timeGrain": "auto"
-          }
+          "queryType": "Azure Log Analytics",
+          "refId": "A",
+          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833"
         }
-      ]
+      ],
+      "title": "Running vs Not Running Containers",
+      "type": "timeseries"
     },
     {
-      "id": 4,
-      "type": "timeseries",
-      "title": "AKS Node Disk Usage %",
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
         "uid": "azure-monitor-oob"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
       },
       "fieldConfig": {
         "defaults": {
@@ -243,6 +164,13 @@
         },
         "overrides": []
       },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
       "options": {
         "legend": {
           "displayMode": "list",
@@ -255,47 +183,28 @@
       },
       "targets": [
         {
-          "refId": "A",
+          "azureLogAnalytics": {
+            "dashboardTime": true,
+            "query": "AzureMetrics\n| where $__timeFilter(TimeGenerated)\n| where ResourceProvider == \"MICROSOFT.CONTAINERSERVICE\"\n| where MetricName == \"node_disk_usage_percentage\"\n| summarize AvgDisk=avg(Average) by bin(TimeGenerated, $__interval)\n| order by TimeGenerated asc",
+            "resources": [
+              "/subscriptions/022f0684-6e55-4dbf-af86-8ea607fe4833/resourceGroups/rg-opslora-prod-monitoring-cin/providers/Microsoft.OperationalInsights/workspaces/law-opslora-prod-cin-001"
+            ],
+            "resultFormat": "time_series",
+            "timeColumn": "TimeGenerated"
+          },
           "datasource": {
             "type": "grafana-azure-monitor-datasource",
             "uid": "azure-monitor-oob"
           },
-          "queryType": "Azure Monitor",
-          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
-          "azureMonitor": {
-            "aggregation": "Average",
-            "allowedTimeGrainsMs": [
-              60000,
-              300000,
-              900000,
-              1800000,
-              3600000,
-              21600000,
-              43200000,
-              86400000
-            ],
-            "dimensionFilters": [],
-            "metricName": "node_disk_usage_percentage",
-            "metricNamespace": "Microsoft.ContainerService/managedClusters",
-            "region": "centralindia",
-            "resources": [
-              {
-                "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
-                "resourceGroup": "rg-opslora-prod-aks-cin",
-                "resourceName": "aks-opslora-prod-cin-001",
-                "metricNamespace": "Microsoft.ContainerService/managedClusters",
-                "region": "centralindia"
-              }
-            ],
-            "timeGrain": "auto"
-          }
+          "queryType": "Azure Log Analytics",
+          "refId": "A",
+          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833"
         }
-      ]
+      ],
+      "title": "AKS Node Disk Usage %",
+      "type": "timeseries"
     },
     {
-      "id": 5,
-      "type": "table",
-      "title": "Recent Failed/Pending Pods",
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
         "uid": "azure-monitor-oob"
@@ -306,34 +215,34 @@
         "x": 0,
         "y": 16
       },
+      "id": 5,
       "options": {
         "showHeader": true
       },
       "targets": [
         {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-azure-monitor-datasource",
-            "uid": "azure-monitor-oob"
-          },
-          "queryType": "Azure Log Analytics",
-          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
           "azureLogAnalytics": {
             "dashboardTime": true,
-            "query": "KubePodInventory\n| where $__timeFilter(TimeGenerated)\n| where ClusterName == 'aks-opslora-prod-cin-001'\n| where Namespace in ('opslora-app-ns', 'argocd')\n| where PodStatus in ('Failed', 'Pending', 'Unknown')\n| project TimeGenerated, Namespace, Name, PodStatus, ContainerStatus\n| order by TimeGenerated desc\n| take 100",
+            "query": "KubePodInventory\n| where $__timeFilter(TimeGenerated)\n| where ClusterName == \"aks-opslora-prod-cin-001\"\n| where ContainerStatus != \"running\" or PodStatus !in (\"Running\", \"Succeeded\")\n| project TimeGenerated, Namespace, Name, PodStatus, ContainerStatus\n| order by TimeGenerated desc\n| take 100",
             "resources": [
               "/subscriptions/022f0684-6e55-4dbf-af86-8ea607fe4833/resourceGroups/rg-opslora-prod-monitoring-cin/providers/Microsoft.OperationalInsights/workspaces/law-opslora-prod-cin-001"
             ],
             "resultFormat": "table",
             "timeColumn": "TimeGenerated"
-          }
+          },
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          },
+          "queryType": "Azure Log Analytics",
+          "refId": "A",
+          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833"
         }
-      ]
+      ],
+      "title": "Recent Failed/Pending Pods",
+      "type": "table"
     },
     {
-      "id": 6,
-      "type": "table",
-      "title": "Recent Restarts",
       "datasource": {
         "type": "grafana-azure-monitor-datasource",
         "uid": "azure-monitor-oob"
@@ -344,29 +253,48 @@
         "x": 12,
         "y": 16
       },
+      "id": 6,
       "options": {
         "showHeader": true
       },
       "targets": [
         {
-          "refId": "A",
-          "datasource": {
-            "type": "grafana-azure-monitor-datasource",
-            "uid": "azure-monitor-oob"
-          },
-          "queryType": "Azure Log Analytics",
-          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833",
           "azureLogAnalytics": {
             "dashboardTime": true,
-            "query": "KubePodInventory\n| where $__timeFilter(TimeGenerated)\n| where ClusterName == 'aks-opslora-prod-cin-001'\n| where Namespace in ('opslora-app-ns', 'argocd')\n| where ContainerRestartCount > 0\n| project TimeGenerated, Namespace, Name, ContainerName, ContainerRestartCount\n| order by TimeGenerated desc\n| take 100",
+            "query": "KubePodInventory\n| where $__timeFilter(TimeGenerated)\n| where ClusterName == \"aks-opslora-prod-cin-001\"\n| where ContainerRestartCount > 0\n| project TimeGenerated, Namespace, Name, ContainerName, ContainerRestartCount\n| order by TimeGenerated desc\n| take 100",
             "resources": [
               "/subscriptions/022f0684-6e55-4dbf-af86-8ea607fe4833/resourceGroups/rg-opslora-prod-monitoring-cin/providers/Microsoft.OperationalInsights/workspaces/law-opslora-prod-cin-001"
             ],
             "resultFormat": "table",
             "timeColumn": "TimeGenerated"
-          }
+          },
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          },
+          "queryType": "Azure Log Analytics",
+          "refId": "A",
+          "subscription": "022f0684-6e55-4dbf-af86-8ea607fe4833"
         }
-      ]
+      ],
+      "title": "Recent Restarts",
+      "type": "table"
     }
-  ]
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": [
+    "opslora",
+    "prod",
+    "aks",
+    "terraform"
+  ],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Opslora Prod AKS Operations",
+  "uid": "opslora-prod-aks-operations",
+  "version": 1
 }
