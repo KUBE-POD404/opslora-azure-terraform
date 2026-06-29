@@ -115,7 +115,7 @@ resource "azurerm_monitor_metric_alert" "aks_unschedulable_pods" {
   criteria {
     metric_namespace = local.aks_metric_namespace
     metric_name      = "cluster_autoscaler_unschedulable_pods_count"
-    aggregation      = "Maximum"
+    aggregation      = "Average"
     operator         = "GreaterThan"
     threshold        = 0
   }
@@ -144,8 +144,10 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "workload_restarts" {
       | where ClusterName == "${var.aks_cluster_name}"
       | where Namespace in ("opslora-app-ns", "argocd")
       | summarize RestartCount=sum(ContainerRestartCount)
+      | project RestartCount
     KQL
     time_aggregation_method = "Maximum"
+    metric_measure_column   = "RestartCount"
     operator                = "GreaterThan"
     threshold               = 0
 
@@ -181,8 +183,10 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "failed_or_pending_pod
       | where Namespace in ("opslora-app-ns", "argocd")
       | where PodStatus in ("Failed", "Pending", "Unknown")
       | summarize ProblemPods=dcount(Name)
+      | project ProblemPods
     KQL
     time_aggregation_method = "Maximum"
+    metric_measure_column   = "ProblemPods"
     operator                = "GreaterThan"
     threshold               = 0
 
