@@ -24,6 +24,14 @@ locals {
       ttl     = 300
       records = ["4.188.112.109"]
     }
+    "argocd-test" = {
+      ttl     = 300
+      records = ["4.188.112.109"]
+    }
+    "argocd" = {
+      ttl     = 300
+      records = ["4.224.188.23"]
+    }
   }
 }
 
