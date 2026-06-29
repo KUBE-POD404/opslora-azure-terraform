@@ -113,7 +113,7 @@ variable "prod_github_actions_oidc_object_id" {
 variable "alert_email_receivers" {
   type        = map(string)
   description = "Map of Azure Monitor action group receiver name to email address. Leave empty to create action group and alert rules without email receivers."
-  default     = {}
+  default     = { platform = "sowrabhmitoshi@outlook.com" }
 }
 
 variable "managed_grafana_admin_principal_object_ids" {
