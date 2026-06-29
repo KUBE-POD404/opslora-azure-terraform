@@ -35,3 +35,21 @@ resource "azurerm_dashboard_grafana" "this" {
     resource_id = azurerm_monitor_workspace.this.id
   }
 }
+
+resource "azurerm_role_assignment" "managed_grafana_admin" {
+  for_each = var.managed_grafana_enabled ? toset(var.managed_grafana_admin_principal_object_ids) : toset([])
+
+  scope                = azurerm_dashboard_grafana.this[0].id
+  role_definition_name = "Grafana Admin"
+  principal_id         = each.value
+  principal_type       = "User"
+}
+
+resource "azurerm_role_assignment" "managed_grafana_viewer" {
+  for_each = var.managed_grafana_enabled ? toset(var.managed_grafana_viewer_principal_object_ids) : toset([])
+
+  scope                = azurerm_dashboard_grafana.this[0].id
+  role_definition_name = "Grafana Viewer"
+  principal_id         = each.value
+  principal_type       = "User"
+}
