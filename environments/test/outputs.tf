@@ -29,3 +29,18 @@ output "container_registry_login_server" {
 output "mysql_fqdn" {
   value = module.mysql.fqdn
 }
+
+output "managed_grafana_endpoint" {
+  value       = module.monitoring.managed_grafana_endpoint
+  description = "Azure Managed Grafana endpoint for the test environment."
+}
+
+output "managed_grafana_id" {
+  value       = module.monitoring.managed_grafana_id
+  description = "Azure Managed Grafana resource ID for the test environment."
+}
+
+output "monitoring_action_group_id" {
+  value       = module.monitoring_alerts.action_group_id
+  description = "Azure Monitor action group used by test platform alerts."
+}
