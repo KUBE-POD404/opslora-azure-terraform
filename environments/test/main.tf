@@ -101,7 +101,10 @@ module "monitoring" {
   resource_group_name     = module.resource_groups.names["rg-${local.prefix}-${local.env}-monitoring-${var.location_code}"]
   retention_in_days       = 30
   managed_grafana_enabled = true
-  tags                    = var.tags
+  managed_grafana_admin_principal_object_ids = [
+    "8b4f488f-f86a-4f52-8572-b5a5c783c1f1", # sowrabhmitoshi@outlook.com
+  ]
+  tags = var.tags
 }
 
 module "monitoring_alerts" {
