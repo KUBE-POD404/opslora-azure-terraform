@@ -94,7 +94,7 @@ variable "prod_private_cluster_enabled" {
 variable "rbac_group_object_ids" {
   type        = map(string)
   description = "Imported Microsoft Entra group object IDs keyed by Opslora group name."
-  default     = {}
+  default     = { platform = "sowrabhmitoshi@outlook.com" }
 }
 
 variable "enable_rbac_assignments" {
@@ -126,4 +126,17 @@ variable "managed_grafana_viewer_principal_object_ids" {
   type        = list(string)
   description = "Microsoft Entra user/group object IDs that receive Grafana Viewer on prod Managed Grafana."
   default     = []
+}
+
+
+variable "monthly_budget_amount" {
+  type        = number
+  description = "Monthly Azure budget amount for the prod subscription."
+  default     = 500
+}
+
+variable "budget_alert_contact_emails" {
+  type        = list(string)
+  description = "Email recipients for subscription budget notifications."
+  default     = ["sowrabhmitoshi@outlook.com"]
 }

@@ -302,3 +302,65 @@ module "monitoring_alerts" {
   enabled                    = true
   tags                       = var.tags
 }
+
+
+module "diagnostic_settings" {
+  source                     = "../../modules/diagnostic-settings"
+  log_analytics_workspace_id = module.monitoring.workspace_id
+
+  diagnostic_settings = {
+    aks = {
+      target_resource_id = module.aks.id
+      log_categories = [
+        "kube-apiserver",
+        "kube-controller-manager",
+        "kube-scheduler",
+        "cluster-autoscaler",
+        "cloud-controller-manager",
+        "guard",
+      ]
+      metric_categories = ["AllMetrics"]
+    }
+    app_gateway = {
+      target_resource_id = module.app_gateway.id
+      log_categories = [
+        "ApplicationGatewayAccessLog",
+        "ApplicationGatewayPerformanceLog",
+        "ApplicationGatewayFirewallLog",
+      ]
+      metric_categories = ["AllMetrics"]
+    }
+    container_registry = {
+      target_resource_id = module.container_registry.id
+      log_categories = [
+        "ContainerRegistryRepositoryEvents",
+        "ContainerRegistryLoginEvents",
+      ]
+      metric_categories = ["AllMetrics"]
+    }
+    mysql = {
+      target_resource_id = module.mysql.id
+      log_categories = [
+        "MySqlSlowLogs",
+        "MySqlAuditLogs",
+      ]
+      metric_categories = ["AllMetrics"]
+    }
+    managed_grafana = {
+      target_resource_id = module.monitoring.managed_grafana_id
+      log_categories = [
+        "GrafanaLoginEvents",
+        "GrafanaUsageInsightsEvents",
+      ]
+      metric_categories = ["AllMetrics"]
+    }
+  }
+}
+
+module "cost_budget" {
+  source          = "../../modules/budget-alert"
+  subscription_id = var.subscription_id
+  name            = "budget-opslora-prod-monthly"
+  amount          = var.monthly_budget_amount
+  contact_emails  = var.budget_alert_contact_emails
+}
