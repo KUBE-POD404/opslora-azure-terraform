@@ -142,6 +142,7 @@ module "app_gateway" {
   resource_group_name = module.resource_groups.names[local.resource_group_names.ingress]
   subnet_id           = module.spoke_network.subnet_ids["snet-ingress"]
   public_ip_name      = "pip-${local.prefix}-${local.env}-agw-${var.location_code}-001"
+  public_ip_zones     = null
   waf_mode            = "Prevention"
   tags                = var.tags
 }
