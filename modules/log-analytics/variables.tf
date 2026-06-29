@@ -20,6 +20,18 @@ variable "managed_grafana_enabled" {
   default = true
 }
 
+variable "managed_grafana_admin_principal_object_ids" {
+  type        = list(string)
+  description = "Microsoft Entra user/group object IDs that should receive Grafana Admin on the managed Grafana instance."
+  default     = []
+}
+
+variable "managed_grafana_viewer_principal_object_ids" {
+  type        = list(string)
+  description = "Microsoft Entra user/group object IDs that should receive Grafana Viewer on the managed Grafana instance."
+  default     = []
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

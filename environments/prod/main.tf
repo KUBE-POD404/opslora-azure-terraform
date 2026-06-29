@@ -14,6 +14,9 @@ locals {
   prefix                      = "opslora"
   env                         = "prod"
   hub_scope                   = "hub"
+  aks_name                    = "aks-${local.prefix}-${local.env}-${var.location_code}-001"
+  aks_resource_group_name     = "rg-${local.prefix}-${local.env}-aks-${var.location_code}"
+  aks_resource_id             = "/subscriptions/${var.subscription_id}/resourceGroups/${local.aks_resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${local.aks_name}"
   ingress_resource_group_name = "rg-${local.prefix}-${local.env}-ingress-${var.location_code}"
   resource_group_names = {
     network    = "rg-${local.prefix}-${local.env}-network-${var.location_code}"
@@ -134,13 +137,15 @@ resource "azurerm_private_dns_zone_virtual_network_link" "prod" {
 }
 
 module "monitoring" {
-  source                  = "../../modules/log-analytics"
-  name                    = "law-${local.prefix}-${local.env}-${var.location_code}-001"
-  location                = var.location
-  resource_group_name     = module.resource_groups.names[local.resource_group_names.monitoring]
-  retention_in_days       = 90
-  managed_grafana_enabled = false
-  tags                    = var.tags
+  source                                      = "../../modules/log-analytics"
+  name                                        = "law-${local.prefix}-${local.env}-${var.location_code}-001"
+  location                                    = var.location
+  resource_group_name                         = module.resource_groups.names[local.resource_group_names.monitoring]
+  retention_in_days                           = 90
+  managed_grafana_enabled                     = true
+  managed_grafana_admin_principal_object_ids  = var.managed_grafana_admin_principal_object_ids
+  managed_grafana_viewer_principal_object_ids = var.managed_grafana_viewer_principal_object_ids
+  tags                                        = var.tags
 }
 
 module "app_gateway" {
@@ -200,7 +205,7 @@ module "mysql" {
 
 module "aks" {
   source                     = "../../modules/aks"
-  name                       = "aks-${local.prefix}-${local.env}-${var.location_code}-001"
+  name                       = local.aks_name
   location                   = var.location
   resource_group_name        = module.resource_groups.names[local.resource_group_names.aks]
   kubernetes_version         = var.kubernetes_version
@@ -267,4 +272,33 @@ resource "azurerm_role_assignment" "agic_ingress_subnet_network_contributor" {
   scope                = module.spoke_network.subnet_ids["snet-ingress"]
   role_definition_name = "Network Contributor"
   principal_id         = module.aks.agic_object_id
+}
+
+resource "azurerm_role_assignment" "managed_grafana_subscription_reader" {
+  scope                = "/subscriptions/${var.subscription_id}"
+  role_definition_name = "Reader"
+  principal_id         = module.monitoring.managed_grafana_principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "managed_grafana_monitoring_reader" {
+  scope                = "/subscriptions/${var.subscription_id}"
+  role_definition_name = "Monitoring Reader"
+  principal_id         = module.monitoring.managed_grafana_principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+module "monitoring_alerts" {
+  source                     = "../../modules/monitoring-alerts"
+  prefix                     = local.prefix
+  env                        = local.env
+  location                   = var.location
+  location_code              = var.location_code
+  resource_group_name        = module.resource_groups.names[local.resource_group_names.monitoring]
+  aks_cluster_id             = local.aks_resource_id
+  aks_cluster_name           = local.aks_name
+  log_analytics_workspace_id = module.monitoring.workspace_id
+  alert_email_receivers      = var.alert_email_receivers
+  enabled                    = true
+  tags                       = var.tags
 }

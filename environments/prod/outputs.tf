@@ -34,6 +34,21 @@ output "mysql_fqdn" {
   value = module.mysql.fqdn
 }
 
+output "managed_grafana_endpoint" {
+  value       = module.monitoring.managed_grafana_endpoint
+  description = "Azure Managed Grafana endpoint for prod observability."
+}
+
+output "managed_grafana_id" {
+  value       = module.monitoring.managed_grafana_id
+  description = "Azure Managed Grafana resource ID for prod observability."
+}
+
+output "monitoring_action_group_id" {
+  value       = module.monitoring_alerts.action_group_id
+  description = "Azure Monitor action group ID for prod platform alerts."
+}
+
 output "mysql_administrator_password" {
   value     = module.mysql.administrator_password
   sensitive = true

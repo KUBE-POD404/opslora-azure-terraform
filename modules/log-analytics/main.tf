@@ -14,20 +14,46 @@ resource "azurerm_monitor_workspace" "this" {
   tags                = var.tags
 }
 
+locals {
+  managed_grafana_name = substr(replace(var.name, "law-", "amg-"), 0, 23)
+}
+
 resource "azurerm_dashboard_grafana" "this" {
   count = var.managed_grafana_enabled ? 1 : 0
 
-  name                              = replace(var.name, "law-", "amg-")
+  name                              = local.managed_grafana_name
   location                          = var.location
   resource_group_name               = var.resource_group_name
   api_key_enabled                   = false
   deterministic_outbound_ip_enabled = false
   public_network_access_enabled     = true
   sku                               = "Standard"
-  grafana_major_version             = 12
+  grafana_major_version             = "12"
   tags                              = var.tags
+
+  identity {
+    type = "SystemAssigned"
+  }
 
   azure_monitor_workspace_integrations {
     resource_id = azurerm_monitor_workspace.this.id
   }
+}
+
+resource "azurerm_role_assignment" "managed_grafana_admin" {
+  for_each = var.managed_grafana_enabled ? toset(var.managed_grafana_admin_principal_object_ids) : toset([])
+
+  scope                = azurerm_dashboard_grafana.this[0].id
+  role_definition_name = "Grafana Admin"
+  principal_id         = each.value
+  principal_type       = "User"
+}
+
+resource "azurerm_role_assignment" "managed_grafana_viewer" {
+  for_each = var.managed_grafana_enabled ? toset(var.managed_grafana_viewer_principal_object_ids) : toset([])
+
+  scope                = azurerm_dashboard_grafana.this[0].id
+  role_definition_name = "Grafana Viewer"
+  principal_id         = each.value
+  principal_type       = "User"
 }
