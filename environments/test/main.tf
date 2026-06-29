@@ -14,6 +14,9 @@ locals {
   prefix                      = "opslora"
   env                         = "test"
   hub_scope                   = "hub"
+  aks_name                    = "aks-${local.prefix}-${local.env}-${var.location_code}-001"
+  aks_resource_group_name     = "rg-${local.prefix}-${local.env}-aks-${var.location_code}"
+  aks_resource_id             = "/subscriptions/${var.subscription_id}/resourceGroups/${local.aks_resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${local.aks_name}"
   ingress_resource_group_name = "rg-${local.prefix}-${local.env}-ingress-${var.location_code}"
   private_dns_zone_names = [
     "private.mysql.database.azure.com",
@@ -97,8 +100,23 @@ module "monitoring" {
   location                = var.location
   resource_group_name     = module.resource_groups.names["rg-${local.prefix}-${local.env}-monitoring-${var.location_code}"]
   retention_in_days       = 30
-  managed_grafana_enabled = false
+  managed_grafana_enabled = true
   tags                    = var.tags
+}
+
+module "monitoring_alerts" {
+  source = "../../modules/monitoring-alerts"
+
+  prefix                     = local.prefix
+  env                        = local.env
+  location                   = var.location
+  location_code              = var.location_code
+  resource_group_name        = module.resource_groups.names["rg-${local.prefix}-${local.env}-monitoring-${var.location_code}"]
+  aks_cluster_id             = local.aks_resource_id
+  aks_cluster_name           = local.aks_name
+  log_analytics_workspace_id = module.monitoring.workspace_id
+  alert_email_receivers      = var.alert_email_receivers
+  tags                       = var.tags
 }
 
 module "app_gateway" {

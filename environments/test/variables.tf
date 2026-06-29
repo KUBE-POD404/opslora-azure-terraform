@@ -78,3 +78,9 @@ variable "enable_governance_policy_assignments" {
   description = "Create audit-mode RBAC/policy governance assignments."
   default     = true
 }
+
+variable "alert_email_receivers" {
+  type        = map(string)
+  description = "Optional Azure Monitor action group email receivers for test alerts, keyed by receiver name."
+  default     = {}
+}
