@@ -82,5 +82,18 @@ variable "enable_governance_policy_assignments" {
 variable "alert_email_receivers" {
   type        = map(string)
   description = "Optional Azure Monitor action group email receivers for test alerts, keyed by receiver name."
-  default     = {}
+  default     = { platform = "sowrabhmitoshi@outlook.com" }
+}
+
+
+variable "monthly_budget_amount" {
+  type        = number
+  description = "Monthly Azure budget amount for the test subscription."
+  default     = 150
+}
+
+variable "budget_alert_contact_emails" {
+  type        = list(string)
+  description = "Email recipients for subscription budget notifications."
+  default     = ["sowrabhmitoshi@outlook.com"]
 }
