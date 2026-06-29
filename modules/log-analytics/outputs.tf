@@ -17,3 +17,8 @@ output "managed_grafana_id" {
 output "managed_grafana_endpoint" {
   value = try(azurerm_dashboard_grafana.this[0].endpoint, null)
 }
+
+output "managed_grafana_principal_id" {
+  value       = try(azurerm_dashboard_grafana.this[0].identity[0].principal_id, null)
+  description = "System-assigned managed identity principal ID for Azure Managed Grafana."
+}

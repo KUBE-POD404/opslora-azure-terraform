@@ -108,3 +108,22 @@ variable "prod_github_actions_oidc_object_id" {
   description = "Microsoft Entra service principal object ID used by GitHub Actions OIDC for prod workflows that seed Key Vault secrets."
   default     = "5e057103-ed39-4bbd-bd57-c1fe8aae0925"
 }
+
+
+variable "alert_email_receivers" {
+  type        = map(string)
+  description = "Map of Azure Monitor action group receiver name to email address. Leave empty to create action group and alert rules without email receivers."
+  default     = {}
+}
+
+variable "managed_grafana_admin_principal_object_ids" {
+  type        = list(string)
+  description = "Microsoft Entra user/group object IDs that receive Grafana Admin on prod Managed Grafana."
+  default     = ["8b4f488f-f86a-4f52-8572-b5a5c783c1f1"]
+}
+
+variable "managed_grafana_viewer_principal_object_ids" {
+  type        = list(string)
+  description = "Microsoft Entra user/group object IDs that receive Grafana Viewer on prod Managed Grafana."
+  default     = []
+}
