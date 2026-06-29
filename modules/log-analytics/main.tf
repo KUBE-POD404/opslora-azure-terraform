@@ -34,6 +34,13 @@ resource "azurerm_dashboard_grafana" "this" {
   azure_monitor_workspace_integrations {
     resource_id = azurerm_monitor_workspace.this.id
   }
+
+  lifecycle {
+    # System-assigned identity was enabled in-place with ARM PATCH because
+    # azurerm currently forces replacement when identity is added to an
+    # existing Managed Grafana resource.
+    ignore_changes = [identity]
+  }
 }
 
 resource "azurerm_role_assignment" "managed_grafana_admin" {

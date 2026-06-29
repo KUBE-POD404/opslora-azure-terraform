@@ -1,7 +1,12 @@
 {
   "title": "Opslora Test AKS Operations",
   "uid": "opslora-test-aks-operations",
-  "tags": ["opslora", "test", "aks", "terraform"],
+  "tags": [
+    "opslora",
+    "test",
+    "aks",
+    "terraform"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
@@ -14,7 +19,12 @@
     {
       "type": "timeseries",
       "title": "AKS Node CPU %",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
       "targets": [
         {
           "queryType": "Azure Monitor",
@@ -24,14 +34,29 @@
             "metricNamespace": "Microsoft.ContainerService/managedClusters",
             "metricName": "node_cpu_usage_percentage",
             "aggregation": "Average"
-          }
+          },
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          },
+          "subscription": "94433754-e73d-429d-85c9-f4cf47043e04",
+          "refId": "A"
         }
-      ]
+      ],
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      }
     },
     {
       "type": "timeseries",
       "title": "AKS Node Memory Working Set %",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
       "targets": [
         {
           "queryType": "Azure Monitor",
@@ -41,14 +66,29 @@
             "metricNamespace": "Microsoft.ContainerService/managedClusters",
             "metricName": "node_memory_working_set_percentage",
             "aggregation": "Average"
-          }
+          },
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          },
+          "subscription": "94433754-e73d-429d-85c9-f4cf47043e04",
+          "refId": "A"
         }
-      ]
+      ],
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      }
     },
     {
       "type": "timeseries",
       "title": "Unschedulable Pods",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
       "targets": [
         {
           "queryType": "Azure Monitor",
@@ -58,31 +98,71 @@
             "metricNamespace": "Microsoft.ContainerService/managedClusters",
             "metricName": "cluster_autoscaler_unschedulable_pods_count",
             "aggregation": "Maximum"
-          }
+          },
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          },
+          "subscription": "94433754-e73d-429d-85c9-f4cf47043e04",
+          "refId": "A"
         }
-      ]
+      ],
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      }
     },
     {
       "type": "table",
       "title": "Recent Failed/Pending Pods",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
       "targets": [
         {
           "queryType": "Azure Log Analytics",
-          "query": "KubePodInventory\n| where TimeGenerated > ago(1h)\n| where ClusterName == 'aks-opslora-test-cin-001'\n| where Namespace in ('opslora-app-ns', 'argocd')\n| where PodStatus in ('Failed', 'Pending', 'Unknown')\n| project TimeGenerated, Namespace, Name, PodStatus, ContainerStatus\n| order by TimeGenerated desc"
+          "query": "KubePodInventory\n| where TimeGenerated > ago(1h)\n| where ClusterName == 'aks-opslora-test-cin-001'\n| where Namespace in ('opslora-app-ns', 'argocd')\n| where PodStatus in ('Failed', 'Pending', 'Unknown')\n| project TimeGenerated, Namespace, Name, PodStatus, ContainerStatus\n| order by TimeGenerated desc",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          },
+          "subscription": "94433754-e73d-429d-85c9-f4cf47043e04",
+          "refId": "A"
         }
-      ]
+      ],
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      }
     },
     {
       "type": "table",
       "title": "Recent Restarts",
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
       "targets": [
         {
           "queryType": "Azure Log Analytics",
-          "query": "KubePodInventory\n| where TimeGenerated > ago(1h)\n| where ClusterName == 'aks-opslora-test-cin-001'\n| where Namespace in ('opslora-app-ns', 'argocd')\n| where ContainerRestartCount > 0\n| project TimeGenerated, Namespace, Name, ContainerName, ContainerRestartCount\n| order by TimeGenerated desc"
+          "query": "KubePodInventory\n| where TimeGenerated > ago(1h)\n| where ClusterName == 'aks-opslora-test-cin-001'\n| where Namespace in ('opslora-app-ns', 'argocd')\n| where ContainerRestartCount > 0\n| project TimeGenerated, Namespace, Name, ContainerName, ContainerRestartCount\n| order by TimeGenerated desc",
+          "datasource": {
+            "type": "grafana-azure-monitor-datasource",
+            "uid": "azure-monitor-oob"
+          },
+          "subscription": "94433754-e73d-429d-85c9-f4cf47043e04",
+          "refId": "A"
         }
-      ]
+      ],
+      "datasource": {
+        "type": "grafana-azure-monitor-datasource",
+        "uid": "azure-monitor-oob"
+      }
     }
   ]
 }

@@ -11,13 +11,16 @@ data "terraform_remote_state" "hub" {
 }
 
 locals {
-  prefix                      = "opslora"
-  env                         = "test"
-  hub_scope                   = "hub"
-  aks_name                    = "aks-${local.prefix}-${local.env}-${var.location_code}-001"
-  aks_resource_group_name     = "rg-${local.prefix}-${local.env}-aks-${var.location_code}"
-  aks_resource_id             = "/subscriptions/${var.subscription_id}/resourceGroups/${local.aks_resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${local.aks_name}"
-  ingress_resource_group_name = "rg-${local.prefix}-${local.env}-ingress-${var.location_code}"
+  prefix                          = "opslora"
+  env                             = "test"
+  hub_scope                       = "hub"
+  aks_name                        = "aks-${local.prefix}-${local.env}-${var.location_code}-001"
+  aks_resource_group_name         = "rg-${local.prefix}-${local.env}-aks-${var.location_code}"
+  aks_resource_id                 = "/subscriptions/${var.subscription_id}/resourceGroups/${local.aks_resource_group_name}/providers/Microsoft.ContainerService/managedClusters/${local.aks_name}"
+  ingress_resource_group_name     = "rg-${local.prefix}-${local.env}-ingress-${var.location_code}"
+  managed_grafana_identity_id     = "d5d303f7-d3e9-4a97-b535-59154a907303"
+  managed_grafana_reader_role_id  = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleAssignments/ae4be27a-fb91-4496-b0b9-4fd9eeb88291"
+  managed_grafana_monitor_role_id = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleAssignments/61b02d35-6e0d-4458-bfe8-77f1f517b199"
   private_dns_zone_names = [
     "private.mysql.database.azure.com",
     "privatelink.blob.core.windows.net",
@@ -210,4 +213,28 @@ resource "azurerm_role_assignment" "agic_ingress_subnet_network_contributor" {
   scope                = module.spoke_network.subnet_ids["snet-ingress"]
   role_definition_name = "Network Contributor"
   principal_id         = module.aks.agic_object_id
+}
+
+resource "azurerm_role_assignment" "managed_grafana_subscription_reader" {
+  scope                = "/subscriptions/${var.subscription_id}"
+  role_definition_name = "Reader"
+  principal_id         = local.managed_grafana_identity_id
+  principal_type       = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "managed_grafana_monitoring_reader" {
+  scope                = "/subscriptions/${var.subscription_id}"
+  role_definition_name = "Monitoring Reader"
+  principal_id         = local.managed_grafana_identity_id
+  principal_type       = "ServicePrincipal"
+}
+
+import {
+  to = azurerm_role_assignment.managed_grafana_subscription_reader
+  id = local.managed_grafana_reader_role_id
+}
+
+import {
+  to = azurerm_role_assignment.managed_grafana_monitoring_reader
+  id = local.managed_grafana_monitor_role_id
 }
