@@ -85,3 +85,22 @@ variable "onprem_a_records" {
   type        = map(string)
   default     = {}
 }
+
+
+variable "alert_email_receivers" {
+  type        = map(string)
+  description = "Map of Azure Monitor action group receiver name to email address."
+  default     = { platform = "sowrabhmitoshi@outlook.com" }
+}
+
+variable "monthly_budget_amount" {
+  type        = number
+  description = "Monthly Azure budget amount for the hub/connectivity subscription."
+  default     = 100
+}
+
+variable "budget_alert_contact_emails" {
+  type        = list(string)
+  description = "Email recipients for subscription budget notifications."
+  default     = ["sowrabhmitoshi@outlook.com"]
+}

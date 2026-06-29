@@ -106,3 +106,51 @@ module "hub_connectivity" {
   onprem_shared_keys          = var.onprem_shared_keys
   tags                        = var.tags
 }
+
+
+module "platform_action_group" {
+  source              = "../../modules/action-group"
+  name                = "ag-opslora-hub-cin-platform-alerts"
+  resource_group_name = module.resource_groups.names["rg-${local.prefix}-${local.scope}-monitoring-${var.location_code}"]
+  short_name          = "hubops"
+  email_receivers     = var.alert_email_receivers
+  tags                = var.tags
+}
+
+module "diagnostic_settings" {
+  source                     = "../../modules/diagnostic-settings"
+  log_analytics_workspace_id = module.monitoring.workspace_id
+
+  diagnostic_settings = {
+    azure_firewall = {
+      target_resource_id = module.hub_security.firewall_id
+      log_categories = [
+        "AZFWNetworkRule",
+        "AZFWApplicationRule",
+        "AZFWNatRule",
+        "AZFWThreatIntel",
+        "AZFWDnsQuery",
+        "AZFWApplicationRuleAggregation",
+        "AZFWNetworkRuleAggregation",
+        "AZFWNatRuleAggregation",
+      ]
+      metric_categories = ["AllMetrics"]
+    }
+    managed_grafana = {
+      target_resource_id = "/subscriptions/${var.subscription_id}/resourceGroups/rg-${local.prefix}-${local.scope}-monitoring-${var.location_code}/providers/Microsoft.Dashboard/grafana/amg-${local.prefix}-${local.scope}-${var.location_code}-001"
+      log_categories = [
+        "GrafanaLoginEvents",
+        "GrafanaUsageInsightsEvents",
+      ]
+      metric_categories = ["AllMetrics"]
+    }
+  }
+}
+
+module "cost_budget" {
+  source          = "../../modules/budget-alert"
+  subscription_id = var.subscription_id
+  name            = "budget-opslora-hub-monthly"
+  amount          = var.monthly_budget_amount
+  contact_emails  = var.budget_alert_contact_emails
+}
